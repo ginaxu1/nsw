@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn2:definitions xmlns:bpmn2="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                   xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                   xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                   id="hypothetical-trade-definitions"
+                   targetNamespace="http://nsw.gov.lk/trade">
+  
+  <bpmn2:process id="hypothetical_trade_v1" name="Hypothetical Trade Workflow v1" isExecutable="true">
+    
+    <!-- Start Event -->
+    <bpmn2:startEvent id="StartEvent_1" name="Consignment Initiated"/>
+    
+    <!-- Task 1: Initialization (Required) -->
+    <bpmn2:userTask id="Task_1_Initialization" name="Task 1: Initialization">
+      <bpmn2:documentation>One-time verification data injection (BR, VAT, TIN)</bpmn2:documentation>
+    </bpmn2:userTask>
+    
+    <!-- Parallel Gateway: AND-Split -->
+    <bpmn2:parallelGateway id="Gateway_ParallelSplit" name="Parallel Split"/>
+    
+    <!-- Task 2: OGA A Review (Parallel Branch 1) -->
+    <bpmn2:userTask id="Task_2_OGA_A" name="Task 2: OGA A Review">
+      <bpmn2:documentation>OGA A (e.g., Tea Board) review and approval</bpmn2:documentation>
+    </bpmn2:userTask>
+    
+    <!-- Task 3: OGA B Review (Parallel Branch 2) -->
+    <bpmn2:userTask id="Task_3_OGA_B" name="Task 3: OGA B Review">
+      <bpmn2:documentation>OGA B (e.g., Coconut Board) review and approval</bpmn2:documentation>
+    </bpmn2:userTask>
+    
+    <!-- Parallel Gateway: AND-Join -->
+    <bpmn2:parallelGateway id="Gateway_ParallelJoin" name="Parallel Join"/>
+    
+    <!-- Task 4: Customs Finalization (Final Step) -->
+    <bpmn2:userTask id="Task_4_Customs" name="Task 4: Customs Finalization">
+      <bpmn2:documentation>ASYCUDA interface - customs finalization</bpmn2:documentation>
+    </bpmn2:userTask>
+    
+    <!-- End Event -->
+    <bpmn2:endEvent id="EndEvent_1" name="Consignment Completed"/>
+    
+    <!-- Sequence Flows -->
+    <bpmn2:sequenceFlow id="Flow_StartToTask1" sourceRef="StartEvent_1" targetRef="Task_1_Initialization"/>
+    <bpmn2:sequenceFlow id="Flow_Task1ToSplit" sourceRef="Task_1_Initialization" targetRef="Gateway_ParallelSplit"/>
+    <bpmn2:sequenceFlow id="Flow_SplitToTask2" sourceRef="Gateway_ParallelSplit" targetRef="Task_2_OGA_A"/>
+    <bpmn2:sequenceFlow id="Flow_SplitToTask3" sourceRef="Gateway_ParallelSplit" targetRef="Task_3_OGA_B"/>
+    <bpmn2:sequenceFlow id="Flow_Task2ToJoin" sourceRef="Task_2_OGA_A" targetRef="Gateway_ParallelJoin"/>
+    <bpmn2:sequenceFlow id="Flow_Task3ToJoin" sourceRef="Task_3_OGA_B" targetRef="Gateway_ParallelJoin"/>
+    <bpmn2:sequenceFlow id="Flow_JoinToTask4" sourceRef="Gateway_ParallelJoin" targetRef="Task_4_Customs"/>
+    <bpmn2:sequenceFlow id="Flow_Task4ToEnd" sourceRef="Task_4_Customs" targetRef="EndEvent_1"/>
+    
+  </bpmn2:process>
+  
+</bpmn2:definitions>
+
