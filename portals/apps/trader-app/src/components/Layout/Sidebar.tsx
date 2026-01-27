@@ -1,10 +1,9 @@
-import {Link, useLocation} from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import {
   DashboardIcon,
-  ArchiveIcon,
   ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon,
 } from '@radix-ui/react-icons'
-import {type ReactNode, useEffect, useState} from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 interface NavItem {
   name: string
@@ -14,7 +13,6 @@ interface NavItem {
 
 const navStructure: NavItemOrGroup[] = [
   { name: 'Dashboard', path: '/', icon: <DashboardIcon className="w-5 h-5" /> },
-  { name: 'Consignments', path: '/consignments', icon: <ArchiveIcon className="w-5 h-5" /> },
 ]
 
 interface NavGroup {
@@ -180,9 +178,8 @@ export function Sidebar({ isExpanded, onToggle }: SidebarProps) {
 
   return (
     <aside
-      className={`${
-        showExpanded ? 'w-64' : 'w-20'
-      } h-[calc(100vh-64px)] bg-linear-to-b from-primary-900 to-primary-950 text-white flex flex-col fixed left-0 top-16 border-r border-primary-800/30 shadow-xl transition-all duration-300 z-20`}
+      className={`${showExpanded ? 'w-64' : 'w-20'
+        } h-[calc(100vh-64px)] bg-linear-to-b from-primary-900 to-primary-950 text-white flex flex-col fixed left-0 top-16 border-r border-primary-800/30 shadow-xl transition-all duration-300 z-20`}
       onMouseEnter={() => !isExpanded && setIsHovered(true)}
       onMouseLeave={() => !isExpanded && setIsHovered(false)}
     >
@@ -205,7 +202,7 @@ export function Sidebar({ isExpanded, onToggle }: SidebarProps) {
               {/*<img src={logoIcon} alt="Textura" className="w-8 h-8 flex-shrink-0" />*/}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-white truncate">NSW</p>
-                <p className="text-xs text-primary-200 truncate">v1.0.0</p>
+                <p className="text-xs text-primary-200 truncate">v0.1.0</p>
               </div>
             </div>
           </div>
@@ -220,11 +217,9 @@ export function Sidebar({ isExpanded, onToggle }: SidebarProps) {
         <div className="px-4 pb-4">
           <button
             onClick={onToggle}
-            className={`${
-              showExpanded ? 'w-full' : 'w-10'
-            } h-10 rounded-full bg-primary-500 hover:bg-primary-600 flex items-center ${
-              showExpanded ? 'justify-between px-4' : 'justify-center'
-            } text-white transition-all shadow-lg`}
+            className={`${showExpanded ? 'w-full' : 'w-10'
+              } h-10 rounded-full bg-primary-500 hover:bg-primary-600 flex items-center ${showExpanded ? 'justify-between px-4' : 'justify-center'
+              } text-white transition-all shadow-lg`}
             title={isExpanded ? "Collapse sidebar" : "Expand sidebar"}
           >
             {showExpanded && (

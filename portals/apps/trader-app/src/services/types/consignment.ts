@@ -16,6 +16,8 @@ export interface ConsignmentStep {
 
 export interface ConsignmentItem {
   hsCodeID: string
+  hsCode?: string
+  hsCodeDescription?: string
   steps: ConsignmentStep[]
 }
 
