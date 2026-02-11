@@ -5,7 +5,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"strings"
 )
 
 type HTTPHandler struct {
@@ -45,12 +44,7 @@ func (h *HTTPHandler) Upload(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HTTPHandler) Download(w http.ResponseWriter, r *http.Request) {
-	// Extract key from URL path
-	// Assuming URL pattern is /api/uploads/{key} or similar
-	// We'll take the last path segment
-	parts := strings.Split(r.URL.Path, "/")
-	key := parts[len(parts)-1]
-
+	key := r.PathValue("key")
 	if key == "" {
 		http.Error(w, `{"error": "key is required"}`, http.StatusBadRequest)
 		return
@@ -67,4 +61,20 @@ func (h *HTTPHandler) Download(w http.ResponseWriter, r *http.Request) {
 	if _, err := io.Copy(w, reader); err != nil {
 		slog.ErrorContext(r.Context(), "Failed to copy file content", "error", err)
 	}
+}
+
+func (h *HTTPHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	key := r.PathValue("key")
+	if key == "" {
+		http.Error(w, `{"error": "key is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	if err := h.Service.Delete(r.Context(), key); err != nil {
+		slog.ErrorContext(r.Context(), "Delete failed", "error", err, "key", key)
+		http.Error(w, `{"error": "failed to delete file"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
