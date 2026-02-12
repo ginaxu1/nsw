@@ -221,8 +221,8 @@ export function useJsonForm({
     if (property.readOnly === true) {
       return true;
     }
-    // Skip if it has x-globalContext (value comes from backend)
-    if (property['x-globalContext']) {
+    // Skip if it has x-globalContext.readFrom (value comes from backend)
+    if (property['x-globalContext']?.readFrom !== "" && property['x-globalContext']?.readFrom !== undefined) {
       return true;
     }
     return false;
