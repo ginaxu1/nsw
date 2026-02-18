@@ -49,7 +49,6 @@ export interface ConsignmentSummary {
   traderId: string
   state: ConsignmentState
   items: ConsignmentItem[]
-  globalContext: GlobalContext
   createdAt: string
   updatedAt: string
   workflowNodeCount: number
