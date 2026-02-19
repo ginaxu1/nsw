@@ -1,4 +1,4 @@
-import {defineConfig} from 'vite'
+import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import dts from 'vite-plugin-dts'
 import * as path from "node:path";
@@ -16,6 +16,7 @@ export default defineConfig({
     dts({
       include: ['src'],
       tsconfigPath: './tsconfig.app.json',
+      rollupTypes: true,
     }),
   ],
   build: {
@@ -26,7 +27,14 @@ export default defineConfig({
       fileName: (format) => `ui.${format}.js`
     },
     rollupOptions: {
-      external: ['react', 'react-dom']
+      external: [
+        'react',
+        'react-dom',
+        'react/jsx-runtime',
+        '@jsonforms/core',
+        '@jsonforms/react',
+        '@radix-ui/themes',
+      ]
     }
   }
 })
