@@ -12,6 +12,7 @@ import {
 } from './LayoutRenderers';
 import FileControl from './FileControl';
 import { FileControlTester } from './FileControlTester';
+import LabelRenderer, { LabelTester } from './LabelRenderer';
 
 export const radixRenderers = [
     { tester: TextControlTester, renderer: TextControl },
@@ -24,6 +25,7 @@ export const radixRenderers = [
     { tester: GroupLayoutTester, renderer: GroupLayoutRenderer },
     { tester: CategorizationLayoutTester, renderer: CategorizationLayoutRenderer },
     { tester: FileControlTester, renderer: FileControl },
+    { tester: LabelTester, renderer: LabelRenderer },
 ];
 
 export * from './TextControl';
@@ -35,3 +37,4 @@ export * from './LayoutRenderers';
 export type { CategorizationLayoutProps };
 export { default as FileControl } from './FileControl';
 export * from './FileControlTester';
+export * from './LabelRenderer';
