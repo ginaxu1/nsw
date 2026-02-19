@@ -11,7 +11,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@lsf/ui': path.resolve(__dirname, '../../ui/src')
+      '@opennsw/ui': path.resolve(__dirname, '../../ui/src')
     }
   }
 })

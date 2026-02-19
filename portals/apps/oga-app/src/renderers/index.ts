@@ -1,5 +1,5 @@
 import { vanillaRenderers } from '@jsonforms/vanilla-renderers';
-import { FileControl, FileControlTester } from '@lsf/ui';
+import { FileControl, FileControlTester } from '@opennsw/ui';
 
 export { FileControl, FileControlTester };
 export const customRenderers = [
