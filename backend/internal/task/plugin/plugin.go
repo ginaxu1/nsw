@@ -13,17 +13,21 @@ type TaskInfo struct {
 	WorkflowID uuid.UUID
 }
 
-// API will be implemented by the TaskContainer, which provides controlled access to Generic Resources
+// API will be implemented by the TaskContainer, which provides controlled access to
+// generic resources and owns all state transitions via the container-level FSM.
 type API interface {
 	GetTaskID() uuid.UUID
 	GetWorkflowID() uuid.UUID
 	GetTaskState() State
-	SetTaskState(state State)
 	ReadFromGlobalStore(key string) (any, bool)
 	WriteToLocalStore(key string, value any) error
 	ReadFromLocalStore(key string) (any, error)
 	GetPluginState() string
-	SetPluginState(state string) error
+	// CanTransition reports whether action is a legal FSM transition from the current plugin state.
+	CanTransition(action string) bool
+	// Transition applies the FSM transition for action, updating and persisting both
+	// plugin state and task state. Returns an error if the action is not permitted.
+	Transition(action string) error
 }
 
 type ExecutionRequest struct {

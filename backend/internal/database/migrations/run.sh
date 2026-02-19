@@ -41,6 +41,7 @@ MIGRATIONS=(
     "005_insert_seed_data.sql"
     "006_insert_seed_data.sql"
     "007_create_trader_contexts.sql"
+    "009_modify_constraint.sql"
 )
 
 echo "Starting database migrations..."

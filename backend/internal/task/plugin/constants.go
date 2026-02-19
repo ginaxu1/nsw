@@ -11,7 +11,8 @@ const (
 type State string
 
 const (
-	InProgress State = "IN_PROGRESS"
-	Completed  State = "COMPLETED"
-	Failed     State = "FAILED"
+	Initialized State = "INITIALIZED"
+	InProgress  State = "IN_PROGRESS"
+	Completed   State = "COMPLETED"
+	Failed      State = "FAILED"
 )

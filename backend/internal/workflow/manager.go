@@ -239,6 +239,8 @@ func (m *Manager) HandleGetPreConsignmentByID(w http.ResponseWriter, r *http.Req
 // Returns an error if the plugin state is not recognized.
 func pluginStateToWorkflowNodeState(state plugin.State) (model.WorkflowNodeState, error) {
 	switch state {
+	case plugin.Initialized:
+		return model.WorkflowNodeStateReady, nil
 	case plugin.InProgress:
 		return model.WorkflowNodeStateInProgress, nil
 	case plugin.Completed:

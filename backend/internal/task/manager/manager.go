@@ -199,7 +199,7 @@ func (tm *taskManager) InitTask(ctx context.Context, request InitTaskRequest) (*
 	}
 
 	// Build the executor from the factory
-	executor, err := tm.factory.BuildExecutor(ctx, request.Type, request.Config)
+	exec, err := tm.factory.BuildExecutor(ctx, request.Type, request.Config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build executor: %w", err)
 	}
@@ -220,7 +220,7 @@ func (tm *taskManager) InitTask(ctx context.Context, request InitTaskRequest) (*
 		globalStateCopy[k] = v
 	}
 
-	activeTask := container.NewContainer(request.TaskID, request.WorkflowID, request.WorkflowNodeTemplateID, globalStateCopy, localStateManager, tm.store, executor)
+	activeTask := container.NewContainer(request.TaskID, request.WorkflowID, request.WorkflowNodeTemplateID, plugin.Initialized, globalStateCopy, localStateManager, tm.store, exec.Plugin, exec.FSM)
 
 	// Convert request.Config to json.RawMessage
 	configBytes, err := json.Marshal(request.Config)
@@ -240,7 +240,7 @@ func (tm *taskManager) InitTask(ctx context.Context, request InitTaskRequest) (*
 		WorkflowID:             request.WorkflowID,
 		WorkflowNodeTemplateID: request.WorkflowNodeTemplateID,
 		Type:                   request.Type,
-		State:                  plugin.InProgress,
+		State:                  plugin.Initialized,
 		Config:                 configBytes,
 		GlobalContext:          globalContextBytes,
 	}
@@ -282,16 +282,7 @@ func (tm *taskManager) execute(ctx context.Context, activeTask *container.Contai
 		return nil, err
 	}
 
-	taskId := activeTask.GetTaskID()
-	// Update task status in database
-
 	if result.NewState != nil {
-		// Update persistent status
-		if err := tm.store.UpdateStatus(taskId, result.NewState); err != nil {
-			slog.ErrorContext(ctx, "failed to update task status in database",
-				"taskID", taskId,
-				"error", err)
-		}
 		tm.notifyWorkflowManager(ctx, activeTask.TaskID, result.NewState, result.ExtendedState, result.AppendGlobalContext)
 	}
 
@@ -339,7 +330,7 @@ func (tm *taskManager) getTask(ctx context.Context, taskID uuid.UUID) (*containe
 	}
 
 	// Rebuild executor
-	executor, err := tm.factory.BuildExecutor(ctx, execution.Type, taskConfig)
+	exec, err := tm.factory.BuildExecutor(ctx, execution.Type, taskConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to rebuild executor: %w", err)
 	}
@@ -365,7 +356,7 @@ func (tm *taskManager) getTask(ctx context.Context, taskID uuid.UUID) (*containe
 	}
 
 	activeContainer := container.NewContainer(
-		execution.ID, execution.WorkflowID, execution.WorkflowNodeTemplateID, globalContext, localState, tm.store, executor)
+		execution.ID, execution.WorkflowID, execution.WorkflowNodeTemplateID, execution.State, globalContext, localState, tm.store, exec.Plugin, exec.FSM)
 
 	// Cache the rebuilt container
 	tm.containerCache.Set(taskID, activeContainer)

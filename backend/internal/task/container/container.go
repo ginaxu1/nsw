@@ -12,7 +12,7 @@ import (
 
 type Container struct {
 	TaskID                 uuid.UUID
-	WorkflowID             uuid.UUID // Parent workflow ID (either consignment or pre-consignment)
+	WorkflowID             uuid.UUID
 	WorkflowNodeTemplateID uuid.UUID
 	State                  plugin.State
 	Executable             plugin.Plugin
@@ -20,6 +20,7 @@ type Container struct {
 	localState             persistence.Manager
 	taskStore              persistence.TaskStoreInterface
 	pluginState            string // Cache for plugin-level business state
+	fsm                    *plugin.PluginFSM
 	mu                     sync.RWMutex
 }
 
@@ -29,18 +30,67 @@ func (c *Container) GetTaskState() plugin.State {
 	return c.State
 }
 
-func (c *Container) SetTaskState(state plugin.State) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.State = state
-}
-
 func (c *Container) Init(api plugin.API) {
 	c.Executable.Init(api)
 }
 
+// CanTransition reports whether action is a legal FSM transition from the current plugin state.
+func (c *Container) CanTransition(action string) bool {
+	if c.fsm == nil {
+		return true
+	}
+	return c.fsm.CanTransition(c.GetPluginState(), action)
+}
+
+// Transition applies the FSM transition for action, updating in-memory state and
+// persisting both plugin state and task state to the store.
+func (c *Container) Transition(action string) error {
+	if c.fsm == nil {
+		return nil
+	}
+	outcome, err := c.fsm.Transition(c.GetPluginState(), action)
+	if err != nil {
+		return err
+	}
+	c.mu.Lock()
+	c.pluginState = outcome.NextPluginState
+	if outcome.NextTaskState != "" {
+		c.State = outcome.NextTaskState
+	}
+	c.mu.Unlock()
+	if err := c.taskStore.UpdatePluginState(c.TaskID, outcome.NextPluginState); err != nil {
+		return err
+	}
+	if outcome.NextTaskState != "" {
+		return c.taskStore.UpdateStatus(c.TaskID, &outcome.NextTaskState)
+	}
+	return nil
+}
+
 func (c *Container) Start(ctx context.Context) (*plugin.ExecutionResponse, error) {
-	return c.Executable.Start(ctx)
+	c.mu.RLock()
+	prev := c.pluginState
+	c.mu.RUnlock()
+
+	resp, err := c.Executable.Start(ctx)
+	if err != nil {
+		return resp, err
+	}
+	if resp == nil {
+		resp = &plugin.ExecutionResponse{}
+	}
+
+	c.mu.RLock()
+	state := c.State
+	pluginState := c.pluginState
+	c.mu.RUnlock()
+
+	if pluginState != prev {
+		resp.NewState = &state
+		resp.ExtendedState = &pluginState
+	}
+
+	return resp, nil
 }
 
 func (c *Container) GetRenderInfo(ctx context.Context) (*plugin.ApiResponse, error) {
@@ -48,7 +98,22 @@ func (c *Container) GetRenderInfo(ctx context.Context) (*plugin.ApiResponse, err
 }
 
 func (c *Container) Execute(ctx context.Context, request *plugin.ExecutionRequest) (*plugin.ExecutionResponse, error) {
-	return c.Executable.Execute(ctx, request)
+	prev := c.GetPluginState()
+	resp, err := c.Executable.Execute(ctx, request)
+	if err != nil {
+		return resp, err
+	}
+	if resp == nil {
+		resp = &plugin.ExecutionResponse{}
+	}
+	c.mu.RLock()
+	state, pluginState := c.State, c.pluginState
+	c.mu.RUnlock()
+	if pluginState != prev {
+		resp.NewState = &state
+		resp.ExtendedState = &pluginState
+	}
+	return resp, nil
 }
 
 func (c *Container) GetTaskID() uuid.UUID {
@@ -72,11 +137,9 @@ func (c *Container) ReadFromLocalStore(key string) (any, error) {
 }
 
 func (c *Container) ReadFromGlobalStore(key string) (any, bool) {
-	// check whether the key exists
 	if _, ok := c.globalState[key]; !ok {
 		return nil, false
 	}
-
 	return c.globalState[key], true
 }
 
@@ -86,33 +149,27 @@ func (c *Container) GetPluginState() string {
 	return c.pluginState
 }
 
-func (c *Container) SetPluginState(state string) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.pluginState = state
-	// Persist to database
-	return c.taskStore.UpdatePluginState(c.TaskID, state)
-}
-
-// NewContainer creates a new container for a task with a given Executable plugin
-func NewContainer(taskId uuid.UUID, workflowId uuid.UUID, workflowNodeTemplateId uuid.UUID, globalStore map[string]any, localStore persistence.Manager, taskStore persistence.TaskStoreInterface, executable plugin.Plugin) *Container {
+// NewContainer creates a new container for a task with a given Executable plugin and FSM.
+// initialState is the task-level state to restore (InProgress for new tasks, or the
+// persisted state when rebuilding from the store after a cache miss).
+func NewContainer(taskId uuid.UUID, workflowId uuid.UUID, workflowNodeTemplateId uuid.UUID, initialState plugin.State, globalStore map[string]any, localStore persistence.Manager, taskStore persistence.TaskStoreInterface, executable plugin.Plugin, fsm *plugin.PluginFSM) *Container {
 	c := &Container{
 		TaskID:                 taskId,
 		WorkflowID:             workflowId,
 		WorkflowNodeTemplateID: workflowNodeTemplateId,
+		State:                  initialState,
 		Executable:             executable,
 		globalState:            globalStore,
 		localState:             localStore,
 		taskStore:              taskStore,
+		fsm:                    fsm,
 	}
 
-	// Load plugin state from database
 	if taskStore != nil {
 		pluginState, err := taskStore.GetPluginState(taskId)
 		if err == nil {
 			c.pluginState = pluginState
 		}
-		// If error, pluginState remains empty string (default)
 	}
 
 	executable.Init(c)

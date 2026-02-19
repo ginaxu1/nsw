@@ -25,15 +25,24 @@ const (
 	SimpleFormActionOgaVerify = "OGA_VERIFICATION"
 )
 
+// Resolved FSM actions for conditional transitions.
+// The plugin's resolveAction method maps public API actions to these before FSM dispatch.
+const (
+	simpleFormFSMSubmitComplete = "SUBMIT_FORM_COMPLETE"
+	simpleFormFSMSubmitAwaitOGA = "SUBMIT_FORM_AWAIT_OGA"
+	simpleFormFSMOgaApproved    = "OGA_VERIFICATION_APPROVED"
+	simpleFormFSMOgaRejected    = "OGA_VERIFICATION_REJECTED"
+)
+
 // SimpleFormState represents the current state the form is in
 type SimpleFormState string
 
 const (
-	Initialized        SimpleFormState = "INITIALIZED"
-	TraderSavedAsDraft SimpleFormState = "DRAFT"
-	TraderSubmitted    SimpleFormState = "SUBMITTED"
-	OGAAcknowledged    SimpleFormState = "OGA_ACKNOWLEDGED"
-	OGAReviewed        SimpleFormState = "OGA_REVIEWED"
+	SimpleFormInitialized SimpleFormState = "INITIALIZED"
+	TraderSavedAsDraft    SimpleFormState = "DRAFT"
+	TraderSubmitted       SimpleFormState = "SUBMITTED"
+	OGAAcknowledged       SimpleFormState = "OGA_ACKNOWLEDGED"
+	OGAReviewed           SimpleFormState = "OGA_REVIEWED"
 )
 
 const TasksAPIPath = "/api/v1/tasks"
@@ -93,6 +102,54 @@ type SimpleForm struct {
 	formService form.FormService
 }
 
+// NewSimpleFormFSM returns the state graph for SimpleForm.
+// It lives here, next to the plugin that owns it.
+//
+// State graph:
+//
+//	""               ──START──────────────────────► INITIALIZED      [no task state change]
+//	INITIALIZED      ──DRAFT_FORM─────────────────► DRAFT            [IN_PROGRESS]
+//	INITIALIZED      ──SUBMIT_FORM_COMPLETE────────► SUBMITTED        [COMPLETED]
+//	INITIALIZED      ──SUBMIT_FORM_AWAIT_OGA───────► OGA_ACKNOWLEDGED [IN_PROGRESS]
+//	DRAFT            ──DRAFT_FORM─────────────────► DRAFT            [IN_PROGRESS]
+//	DRAFT            ──SUBMIT_FORM_COMPLETE────────► SUBMITTED        [COMPLETED]
+//	DRAFT            ──SUBMIT_FORM_AWAIT_OGA───────► OGA_ACKNOWLEDGED [IN_PROGRESS]
+//	OGA_ACKNOWLEDGED ──OGA_VERIFICATION_APPROVED──► OGA_REVIEWED     [COMPLETED]
+//	OGA_ACKNOWLEDGED ──OGA_VERIFICATION_REJECTED──► OGA_REVIEWED     [FAILED]
+func NewSimpleFormFSM() *PluginFSM {
+	return NewPluginFSM(map[TransitionKey]TransitionOutcome{
+		{"", FSMActionStart}: {string(SimpleFormInitialized), ""},
+
+		{string(SimpleFormInitialized), SimpleFormActionDraft}: {string(TraderSavedAsDraft), InProgress},
+		{string(TraderSavedAsDraft), SimpleFormActionDraft}:    {string(TraderSavedAsDraft), InProgress},
+
+		{string(SimpleFormInitialized), simpleFormFSMSubmitComplete}: {string(TraderSubmitted), Completed},
+		{string(TraderSavedAsDraft), simpleFormFSMSubmitComplete}:    {string(TraderSubmitted), Completed},
+
+		{string(SimpleFormInitialized), simpleFormFSMSubmitAwaitOGA}: {string(OGAAcknowledged), InProgress},
+		{string(TraderSavedAsDraft), simpleFormFSMSubmitAwaitOGA}:    {string(OGAAcknowledged), InProgress},
+
+		{string(OGAAcknowledged), simpleFormFSMOgaApproved}: {string(OGAReviewed), Completed},
+		{string(OGAAcknowledged), simpleFormFSMOgaRejected}: {string(OGAReviewed), Failed},
+	})
+}
+
+func NewSimpleForm(configJSON json.RawMessage, cfg *config.Config, formService form.FormService) (*SimpleForm, error) {
+	var formConfig Config
+	if err := json.Unmarshal(configJSON, &formConfig); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+	return &SimpleForm{
+		config:      formConfig,
+		cfg:         cfg,
+		formService: formService,
+	}, nil
+}
+
+func (s *SimpleForm) Init(api API) {
+	s.api = api
+}
+
 func (s *SimpleForm) GetRenderInfo(ctx context.Context) (*ApiResponse, error) {
 	if err := s.populateFromRegistry(ctx); err != nil {
 		return &ApiResponse{
@@ -137,15 +194,277 @@ func (s *SimpleForm) GetRenderInfo(ctx context.Context) (*ApiResponse, error) {
 	}, nil
 }
 
+func (s *SimpleForm) Start(ctx context.Context) (*ExecutionResponse, error) {
+	if !s.api.CanTransition(FSMActionStart) {
+		return &ExecutionResponse{Message: "SimpleForm task already started"}, nil
+	}
+	if s.config.FormID != "" && s.config.Schema == nil {
+		if err := s.populateFromRegistry(ctx); err != nil {
+			slog.Error("failed to populate form from registry", "formId", s.config.FormID, "error", err)
+			return nil, fmt.Errorf("failed to populate form from registry: %w", err)
+		}
+	}
+	if err := s.api.Transition(FSMActionStart); err != nil {
+		return nil, err
+	}
+	return &ExecutionResponse{Message: "SimpleForm task started successfully"}, nil
+}
+
+func (s *SimpleForm) Execute(ctx context.Context, request *ExecutionRequest) (*ExecutionResponse, error) {
+	action, err := s.resolveAction(request)
+	if err != nil {
+		return nil, err
+	}
+	if !s.api.CanTransition(action) {
+		return nil, fmt.Errorf("fsm: action %q not permitted in state %q", request.Action, s.api.GetPluginState())
+	}
+	resp, err := s.dispatch(ctx, action, request.Content)
+	if err != nil {
+		return resp, err
+	}
+	if err := s.api.Transition(action); err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+// resolveAction maps the public API action string to an FSM action.
+// For actions with conditional outcomes it inspects the request to pick the right edge.
+func (s *SimpleForm) resolveAction(request *ExecutionRequest) (string, error) {
+	switch request.Action {
+	case SimpleFormActionSubmit:
+		if s.requiresVerification() {
+			return simpleFormFSMSubmitAwaitOGA, nil
+		}
+		return simpleFormFSMSubmitComplete, nil
+
+	case SimpleFormActionOgaVerify:
+		data, err := s.parseFormData(request.Content)
+		if err != nil {
+			return "", fmt.Errorf("invalid verification data: %w", err)
+		}
+		decision, _ := data["decision"].(string)
+		if strings.ToUpper(decision) == "APPROVED" { // TODO: Need to change this hardcoded APPROVED
+			return simpleFormFSMOgaApproved, nil
+		}
+		return simpleFormFSMOgaRejected, nil
+
+	default:
+		return request.Action, nil
+	}
+}
+
+// dispatch routes an already-resolved FSM action to the appropriate handler.
+func (s *SimpleForm) dispatch(ctx context.Context, action string, content any) (*ExecutionResponse, error) {
+	switch action {
+	case SimpleFormActionDraft:
+		return s.draftHandler(ctx, content)
+	case simpleFormFSMSubmitComplete, simpleFormFSMSubmitAwaitOGA:
+		return s.submitHandler(ctx, content)
+	case simpleFormFSMOgaApproved:
+		return s.ogaApprovedHandler(ctx, content)
+	case simpleFormFSMOgaRejected:
+		return s.ogaRejectedHandler(ctx, content)
+	default:
+		return nil, fmt.Errorf("unhandled FSM action: %q", action)
+	}
+}
+
+// ── Handlers ──────────────────────────────────────────────────────────────────
+
+// draftHandler saves the current form data as a draft to local store.
+func (s *SimpleForm) draftHandler(_ context.Context, content any) (*ExecutionResponse, error) {
+	if err := s.api.WriteToLocalStore("trader:form", content); err != nil {
+		return &ExecutionResponse{
+			ApiResponse: &ApiResponse{
+				Success: false,
+				Error:   &ApiError{Code: "SAVE_DRAFT_FAILED", Message: "Failed to save draft."},
+			},
+		}, err
+	}
+	return &ExecutionResponse{ApiResponse: &ApiResponse{Success: true}}, nil
+}
+
+// submitHandler is shared by SUBMIT_FORM_COMPLETE and SUBMIT_FORM_AWAIT_OGA.
+// It persists the submission, extracts global context values, and optionally
+// sends the data to an external service.
+func (s *SimpleForm) submitHandler(ctx context.Context, content any) (*ExecutionResponse, error) {
+	formData, err := s.parseFormData(content)
+	if err != nil {
+		return &ExecutionResponse{
+			ApiResponse: &ApiResponse{
+				Success: false,
+				Error:   &ApiError{Code: "INVALID_FORM_DATA", Message: "Invalid form Data, Parsing Failed."},
+			},
+		}, err
+	}
+
+	if err := s.api.WriteToLocalStore("trader:form", formData); err != nil {
+		slog.Warn("failed to write form data to local store", "error", err)
+	}
+
+	if err := s.populateFromRegistry(ctx); err != nil {
+		return &ExecutionResponse{
+			ApiResponse: &ApiResponse{
+				Success: false,
+				Error:   &ApiError{Code: "INVALID_FORM_DATA", Message: "Failed to process form data."},
+			},
+		}, err
+	}
+
+	var parsedSchema jsonform.JSONSchema
+	if err := json.Unmarshal(s.config.Schema, &parsedSchema); err != nil {
+		return &ExecutionResponse{
+			ApiResponse: &ApiResponse{
+				Success: false,
+				Error:   &ApiError{Code: "INVALID_FORM_DATA", Message: "Failed to parse schema."},
+			},
+		}, err
+	}
+
+	globalContextPairs := make(map[string]any)
+	err = jsonform.Traverse(&parsedSchema, func(path string, node *jsonform.JSONSchema, parent *jsonform.JSONSchema) error {
+		if node.Type == "string" || node.Type == "number" || node.Type == "boolean" {
+			if node.XGlobalContext != nil &&
+				node.XGlobalContext.WriteTo != nil &&
+				strings.TrimSpace(*node.XGlobalContext.WriteTo) != "" {
+				value, exists := jsonform.GetValueByPath(formData, path)
+				if !exists {
+					return fmt.Errorf("value for global context path '%s' not found in submitted form data", *node.XGlobalContext.WriteTo)
+				}
+				globalContextPairs[*node.XGlobalContext.WriteTo] = value
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		return &ExecutionResponse{
+			ApiResponse: &ApiResponse{
+				Success: false,
+				Error:   &ApiError{Code: "INVALID_FORM_DATA", Message: "Failed to process form data."},
+			},
+		}, err
+	}
+
+	submissionUrl := s.submissionUrl()
+	if submissionUrl == "" {
+		return &ExecutionResponse{
+			AppendGlobalContext: globalContextPairs,
+			Message:             "Form submitted successfully",
+			ApiResponse:         &ApiResponse{Success: true},
+		}, nil
+	}
+
+	requestPayload := map[string]any{
+		"data":       formData,
+		"taskId":     s.api.GetTaskID().String(),
+		"workflowId": s.api.GetWorkflowID().String(),
+		"serviceUrl": strings.TrimRight(s.cfg.Server.ServiceURL, "/") + TasksAPIPath,
+	}
+	if s.config.Submission != nil && s.config.Submission.Request != nil {
+		requestPayload["meta"] = s.config.Submission.Request.Meta
+	}
+
+	responseData, err := s.sendFormSubmission(submissionUrl, requestPayload)
+	if err != nil {
+		slog.Error("failed to send form submission",
+			"formId", s.config.FormID, "submissionUrl", submissionUrl, "error", err)
+		return &ExecutionResponse{
+			AppendGlobalContext: globalContextPairs,
+			ApiResponse: &ApiResponse{
+				Success: false,
+				Error:   &ApiError{Code: "FORM_SUBMISSION_FAILED", Message: "Failed to submit form to external system."},
+			},
+		}, err
+	}
+
+	if s.config.Submission != nil &&
+		s.config.Submission.Response != nil &&
+		s.config.Submission.Response.Mapping != nil {
+		slog.Info("received response from form submission, parsing based on expected mapping",
+			"formId", s.config.FormID, "submissionUrl", submissionUrl, "response", responseData)
+		parsed, err := s.parseResponseData(responseData, s.config.Submission.Response.Mapping)
+		if err != nil {
+			slog.Warn("failed to parse some submission response data fields, continuing with what was found",
+				"formId", s.config.FormID, "submissionUrl", submissionUrl, "error", err)
+		}
+		for k, v := range parsed {
+			globalContextPairs[k] = v
+		}
+	}
+
+	return &ExecutionResponse{
+		AppendGlobalContext: globalContextPairs,
+		Message:             "Form submitted successfully",
+		ApiResponse:         &ApiResponse{Success: true},
+	}, nil
+}
+
+// ogaApprovedHandler handles OGA_VERIFICATION_APPROVED: stores the OGA response
+// and maps callback fields to global context.
+func (s *SimpleForm) ogaApprovedHandler(_ context.Context, content any) (*ExecutionResponse, error) {
+	verificationData, err := s.parseAndStoreOgaResponse(content)
+	if err != nil {
+		return nil, err
+	}
+
+	globalContextPairs := make(map[string]any)
+
+	if s.config.Callback != nil &&
+		s.config.Callback.Response != nil &&
+		s.config.Callback.Response.Mapping != nil {
+		slog.Info("parsing OGA verification response based on expected mapping",
+			"formId", s.config.FormID,
+			"mapping", s.config.Callback.Response.Mapping,
+			"verificationData", verificationData)
+
+		parsed, err := s.parseResponseData(verificationData, s.config.Callback.Response.Mapping)
+
+		if err != nil {
+			slog.Warn("failed to parse some OGA verification response data fields, continuing with what was found",
+				"formId", s.config.FormID, "error", err)
+		}
+		for k, v := range parsed {
+			globalContextPairs[k] = v
+		}
+	}
+
+	return &ExecutionResponse{
+		AppendGlobalContext: globalContextPairs,
+		Message:             "Form verified by OGA, task completed",
+	}, nil
+}
+
+// ogaRejectedHandler handles OGA_VERIFICATION_REJECTED: stores the rejection response.
+func (s *SimpleForm) ogaRejectedHandler(_ context.Context, content any) (*ExecutionResponse, error) {
+	if _, err := s.parseAndStoreOgaResponse(content); err != nil {
+		return nil, err
+	}
+	return &ExecutionResponse{Message: "Verification rejected or invalid"}, nil
+}
+
+// parseAndStoreOgaResponse parses the OGA payload and persists it to local store.
+func (s *SimpleForm) parseAndStoreOgaResponse(content any) (map[string]any, error) {
+	verificationData, err := s.parseFormData(content)
+	if err != nil {
+		return nil, fmt.Errorf("invalid verification data: %w", err)
+	}
+	if err := s.api.WriteToLocalStore("ogaResponse", verificationData); err != nil {
+		return nil, err
+	}
+	return verificationData, nil
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 // resolveFormData returns the appropriate form data for the current plugin state.
 func (s *SimpleForm) resolveFormData(ctx context.Context, state SimpleFormState) (any, error) {
 	switch state {
-	case Initialized:
+	case SimpleFormInitialized:
 		return s.prepopulateFormData(ctx, s.config.FormData)
-	case TraderSavedAsDraft:
-		return s.api.ReadFromLocalStore("trader:draft")
-	case TraderSubmitted, OGAAcknowledged, OGAReviewed:
-		return s.api.ReadFromLocalStore("trader:submission")
+	case TraderSavedAsDraft, TraderSubmitted, OGAAcknowledged, OGAReviewed:
+		return s.api.ReadFromLocalStore("trader:form")
 	default:
 		return s.config.FormData, nil
 	}
@@ -167,7 +486,6 @@ func (s *SimpleForm) attachOgaContent(ctx context.Context, content map[string]an
 			s.config.Callback.Response.Display.FormID != "" {
 
 			formID, err := uuid.Parse(s.config.Callback.Response.Display.FormID)
-
 			if err != nil {
 				slog.Warn("invalid OGA review form ID format, expected UUID",
 					"formId", s.config.FormID,
@@ -175,9 +493,7 @@ func (s *SimpleForm) attachOgaContent(ctx context.Context, content map[string]an
 					"error", err)
 				return
 			}
-			// If OGA review form is configured, fetch the form definition and include in content for rendering
 			formDef, err := s.formService.GetFormByID(ctx, formID)
-
 			if err != nil {
 				slog.Warn("failed to fetch OGA review form definition, continuing without it",
 					"formId", s.config.FormID,
@@ -185,7 +501,6 @@ func (s *SimpleForm) attachOgaContent(ctx context.Context, content map[string]an
 					"error", err)
 				return
 			}
-
 			content["ogaReviewForm"] = map[string]any{
 				"title":    formDef.Name,
 				"uiSchema": formDef.UISchema,
@@ -196,391 +511,24 @@ func (s *SimpleForm) attachOgaContent(ctx context.Context, content map[string]an
 	}
 }
 
-func NewSimpleForm(configJSON json.RawMessage, cfg *config.Config, formService form.FormService) (*SimpleForm, error) {
-
-	var formConfig Config
-	if err := json.Unmarshal(configJSON, &formConfig); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
-	}
-
-	return &SimpleForm{
-		config:      formConfig,
-		cfg:         cfg,
-		formService: formService,
-	}, nil
-}
-
-func (s *SimpleForm) Init(api API) {
-	s.api = api
-}
-
-func (s *SimpleForm) Start(ctx context.Context) (*ExecutionResponse, error) {
-	// Populate form definition from registry if only formId is provided
-	if s.config.FormID != "" && s.config.Schema == nil {
-		if err := s.populateFromRegistry(ctx); err != nil {
-			slog.Error("failed to populate form from registry", "formId", s.config.FormID, "error", err)
-			return nil, fmt.Errorf("failed to populate form from registry: %w", err)
-		}
-	}
-
-	// Set initial plugin state if not already set
-	if s.api.GetPluginState() == "" {
-		if err := s.api.SetPluginState(string(Initialized)); err != nil {
-			slog.Error("failed to set initial plugin state", "error", err)
-			return nil, fmt.Errorf("failed to set initial plugin state: %w", err)
-		}
-	}
-
-	return &ExecutionResponse{
-		Message: "SimpleForm task started successfully",
-	}, nil
-}
-
-func (s *SimpleForm) Execute(ctx context.Context, request *ExecutionRequest) (*ExecutionResponse, error) {
-	action := request.Action
-
-	switch action {
-	case SimpleFormActionDraft:
-		return s.handleSaveAsDraft(ctx, request.Content)
-	case SimpleFormActionSubmit:
-		return s.handleSubmitForm(ctx, request.Content)
-	case SimpleFormActionOgaVerify:
-		return s.handleOgaVerification(ctx, request.Content)
-	default:
-		return nil, fmt.Errorf("unknown action: %s", action)
-	}
-}
-
-func (s *SimpleForm) handleSaveAsDraft(_ context.Context, content any) (*ExecutionResponse, error) {
-	err := s.api.WriteToLocalStore("trader:draft", content)
-	if err != nil {
-		return &ExecutionResponse{
-			Message: fmt.Sprintf("Failed to save draft: %v", err),
-			ApiResponse: &ApiResponse{
-				Success: false,
-				Error: &ApiError{
-					Code:    "SAVE_DRAFT_FAILED",
-					Message: "Failed to save draft.",
-				},
-			},
-		}, err
-	}
-
-	pluginState := string(TraderSavedAsDraft)
-	if err := s.api.SetPluginState(pluginState); err != nil {
-		slog.Error("failed to set plugin state to SAVED_AS_DRAFT", "error", err)
-	}
-
-	newState := InProgress
-
-	return &ExecutionResponse{
-		NewState:      &newState,
-		ExtendedState: &pluginState,
-		ApiResponse: &ApiResponse{
-			Success: true,
-		},
-	}, nil
-}
-
-// populateFromRegistry fills in the form definition from the registry based on formId
 func (s *SimpleForm) populateFromRegistry(ctx context.Context) error {
 	if s.formService == nil {
 		return fmt.Errorf("form service is required to populate form definition")
 	}
-
-	// Parse form ID as UUID
 	formUUID, err := uuid.Parse(s.config.FormID)
 	if err != nil {
 		return fmt.Errorf("invalid form ID format (expected UUID): %w", err)
 	}
-
-	// Get form from service
 	def, err := s.formService.GetFormByID(ctx, formUUID)
 	if err != nil {
 		return fmt.Errorf("failed to get form definition for formId %s: %w", s.config.FormID, err)
 	}
-
 	s.config.Title = def.Name
 	s.config.Schema = def.Schema
 	s.config.UISchema = def.UISchema
-
 	return nil
 }
 
-// handleSubmitForm validates and processes the form submission
-func (s *SimpleForm) handleSubmitForm(ctx context.Context, content interface{}) (*ExecutionResponse, error) {
-	// Parse form data from content
-	formData, err := s.parseFormData(content)
-	if err != nil {
-		return &ExecutionResponse{
-			Message: fmt.Sprintf("Invalid form data: %v", err),
-			ApiResponse: &ApiResponse{
-				Success: false,
-				Error: &ApiError{
-					Code:    "INVALID_FORM_DATA",
-					Message: "Invalid form Data, Parsing Failed.",
-				},
-			},
-		}, err
-	}
-
-	// Store form data in local state
-	if err := s.api.WriteToLocalStore("trader:submission", formData); err != nil {
-		slog.Warn("failed to write form data to local store", "error", err)
-	}
-
-	if err := s.populateFromRegistry(ctx); err != nil {
-		return &ExecutionResponse{
-			Message: fmt.Sprintf("Failed to process form data: %v", err),
-			ApiResponse: &ApiResponse{
-				Success: false,
-				Error: &ApiError{
-					Code:    "INVALID_FORM_DATA",
-					Message: "Failed to process form data.",
-				},
-			},
-		}, err
-	}
-
-	// Convert the schema to JSONSchema
-	var parsedSchema jsonform.JSONSchema
-
-	if err := json.Unmarshal(s.config.Schema, &parsedSchema); err != nil {
-		return &ExecutionResponse{
-			Message: fmt.Sprintf("Failed to parse schema: %v", err),
-			ApiResponse: &ApiResponse{
-				Success: false,
-				Error: &ApiError{
-					Code:    "INVALID_FORM_DATA",
-					Message: "Failed to parse schema.",
-				},
-			},
-		}, err
-	}
-
-	globalContextPairs := make(map[string]any)
-
-	// Traverse through formData and check for globalContext paths
-	err = jsonform.Traverse(&parsedSchema, func(path string, node *jsonform.JSONSchema, parent *jsonform.JSONSchema) error {
-		if node.Type == "string" || node.Type == "number" || node.Type == "boolean" {
-			// Get the value from formData using the path
-
-			if node.XGlobalContext != nil &&
-				node.XGlobalContext.WriteTo != nil &&
-				strings.TrimSpace(*node.XGlobalContext.WriteTo) != "" {
-
-				value, exists := jsonform.GetValueByPath(formData, path)
-				if !exists {
-					return fmt.Errorf("value for global context path '%s' not found in submitted form data", *node.XGlobalContext.WriteTo)
-				}
-
-				globalContextPairs[*node.XGlobalContext.WriteTo] = value
-			}
-		}
-		return nil
-	})
-
-	if err != nil {
-		return &ExecutionResponse{
-			Message: fmt.Sprintf("Failed to process form data: %v", err),
-			ApiResponse: &ApiResponse{
-				Success: false,
-				Error: &ApiError{
-					Code:    "INVALID_FORM_DATA",
-					Message: "Failed to process form data.",
-				},
-			},
-		}, err
-	}
-
-	// Update plugin state to TRADER_SUBMITTED
-	if err := s.api.SetPluginState(string(TraderSubmitted)); err != nil {
-		slog.Error("failed to set plugin state to SUBMITTED", "error", err)
-	}
-	pluginState := string(TraderSubmitted)
-
-	// If submissionUrl is provided, send the form data to that URL
-	submissionUrl := s.submissionUrl()
-	if submissionUrl != "" {
-		requestPayload := map[string]any{
-			"data":       formData,
-			"taskId":     s.api.GetTaskID().String(),
-			"workflowId": s.api.GetWorkflowID().String(),
-			"serviceUrl": strings.TrimRight(s.cfg.Server.ServiceURL, "/") + TasksAPIPath,
-		}
-
-		if s.config.Submission != nil && s.config.Submission.Request != nil {
-			// Attach the submission request payload to the request payload
-			requestPayload["meta"] = s.config.Submission.Request.Meta
-		}
-
-		responseData, err := s.sendFormSubmission(submissionUrl, requestPayload)
-		if err != nil {
-			slog.Error("failed to send form submission",
-				"formId", s.config.FormID,
-				"submissionUrl", submissionUrl,
-				"error", err)
-			return &ExecutionResponse{
-				Message:             fmt.Sprintf("Failed to submit form to external system: %v", err),
-				AppendGlobalContext: globalContextPairs,
-				ApiResponse: &ApiResponse{
-					Success: false,
-					Error: &ApiError{
-						Code:    "FORM_SUBMISSION_FAILED",
-						Message: "Failed to submit form to external system.",
-					},
-				},
-			}, err
-		}
-
-		// If there are expected response mappings, to global state keys, parse the response accordingly and store in
-		// global context for future use (e.g. in OGA verification or downstream tasks)
-		if s.config.Submission != nil &&
-			s.config.Submission.Response != nil &&
-			s.config.Submission.Response.Mapping != nil {
-			slog.Info("received response from form submission, parsing based on expected mapping",
-				"formId", s.config.FormID,
-				"submissionUrl", submissionUrl,
-				"response", responseData)
-
-			parsed, err := s.parseResponseData(responseData, s.config.Submission.Response.Mapping)
-			if err != nil {
-				slog.Warn("failed to parse some submission response data fields, continuing with what was found",
-					"formId", s.config.FormID,
-					"submissionUrl", submissionUrl,
-					"error", err)
-			}
-			if len(parsed) > 0 {
-				for k, v := range parsed {
-					globalContextPairs[k] = v
-				}
-			}
-		}
-
-		// Check if OGA verification is required
-		if s.requiresVerification() {
-			slog.Info("form submitted, waiting for OGA verification",
-				"formId", s.config.FormID,
-				"submissionUrl", submissionUrl)
-
-			// Update plugin state to OGA_ACKNOWLEDGED
-			if err := s.api.SetPluginState(string(OGAAcknowledged)); err != nil {
-				slog.Error("failed to set plugin state to OGA_ACKNOWLEDGED", "error", err)
-			}
-			pluginState = string(OGAAcknowledged)
-
-			newState := InProgress
-			return &ExecutionResponse{
-				AppendGlobalContext: globalContextPairs,
-				NewState:            &newState,
-				ExtendedState:       &pluginState,
-				Message:             "Form submitted successfully, awaiting OGA verification",
-				ApiResponse: &ApiResponse{
-					Success: true,
-				},
-			}, nil
-		}
-
-		// No OGA verification required - complete the task with response data
-		slog.Info("form submitted and completed",
-			"formId", s.config.FormID,
-			"submissionUrl", submissionUrl,
-			"response", responseData)
-
-		newState := Completed
-		return &ExecutionResponse{
-			AppendGlobalContext: globalContextPairs,
-			NewState:            &newState,
-			ExtendedState:       &pluginState,
-			Message:             "Form submitted and processed successfully",
-			ApiResponse: &ApiResponse{
-				Success: true,
-			},
-		}, nil
-	}
-
-	// If no submissionUrl, task is completed
-	newState := Completed
-	return &ExecutionResponse{
-		AppendGlobalContext: globalContextPairs,
-		NewState:            &newState,
-		ExtendedState:       &pluginState,
-		Message:             "Form submitted successfully",
-		ApiResponse: &ApiResponse{
-			Success: true,
-		},
-	}, nil
-}
-
-// handleOgaVerification handles the OGA_VERIFICATION action and marks the task as completed
-func (s *SimpleForm) handleOgaVerification(_ context.Context, content interface{}) (*ExecutionResponse, error) {
-	verificationData, err := s.parseFormData(content)
-	if err != nil {
-		return &ExecutionResponse{
-			Message: fmt.Sprintf("Invalid verification data: %v", err),
-		}, err
-	}
-
-	err = s.api.WriteToLocalStore("ogaResponse", verificationData)
-
-	if err != nil {
-		return nil, err
-	}
-
-	// Update plugin state to OGA_REVIEWED (common for both approved and rejected)
-	if err := s.api.SetPluginState(string(OGAReviewed)); err != nil {
-		slog.Error("failed to set plugin state to OGA_REVIEWED", "error", err)
-	}
-	pluginState := string(OGAReviewed)
-
-	// Check if verification was approved
-	decision, ok := verificationData["decision"].(string)
-	if !ok || strings.ToUpper(decision) != "APPROVED" { // TODO: Need to change this hardcoded APPROVED
-		// Mark task as FAILED
-		newState := Failed
-		return &ExecutionResponse{
-			NewState:      &newState,
-			ExtendedState: &pluginState,
-			Message:       "Verification rejected or invalid",
-		}, nil
-	}
-
-	// If there are any mapping of OGA verification response to global context, parse and store in global context for future use(e.g. downstream tasks)
-	globalContextPairs := make(map[string]any)
-
-	if s.config.Callback != nil &&
-		s.config.Callback.Response != nil &&
-		s.config.Callback.Response.Mapping != nil {
-		slog.Info("parsing OGA verification response based on expected mapping",
-			"formId", s.config.FormID,
-			"mapping", s.config.Callback.Response.Mapping,
-			"verificationData", verificationData)
-
-		parsed, err := s.parseResponseData(verificationData, s.config.Callback.Response.Mapping)
-
-		if err != nil {
-			slog.Warn("failed to parse some OGA verification response data fields, continuing with what was found",
-				"formId", s.config.FormID,
-				"error", err)
-		}
-		if len(parsed) > 0 {
-			for k, v := range parsed {
-				globalContextPairs[k] = v
-			}
-		}
-	}
-
-	// Mark task as COMPLETED
-	newState := Completed
-	return &ExecutionResponse{
-		NewState:            &newState,
-		ExtendedState:       &pluginState,
-		AppendGlobalContext: globalContextPairs,
-		Message:             "Form verified by OGA, task completed",
-	}, nil
-}
-
-// parseFormData parses the content into a map[string]interface{}
 func (s *SimpleForm) parseFormData(content interface{}) (map[string]interface{}, error) {
 	if content == nil {
 		return nil, fmt.Errorf("content is required")
@@ -730,13 +678,7 @@ func (s *SimpleForm) sendFormSubmission(url string, formData map[string]interfac
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal form data: %w", err)
 	}
-
-	// Create HTTP client with timeout
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-	}
-
-	// Send POST request
+	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Post(url, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to send POST request: %w", err)
@@ -758,20 +700,11 @@ func (s *SimpleForm) sendFormSubmission(url string, formData map[string]interfac
 	var responseData map[string]interface{}
 	if len(body) > 0 {
 		if err := json.Unmarshal(body, &responseData); err != nil {
-			slog.Warn("failed to parse response as JSON, storing as raw string",
-				"url", url,
-				"error", err)
-			responseData = map[string]interface{}{
-				"raw_response": string(body),
-			}
+			slog.Warn("failed to parse response as JSON, storing as raw string", "url", url, "error", err)
+			responseData = map[string]interface{}{"raw_response": string(body)}
 		}
 	}
-
-	slog.Info("form submitted successfully",
-		"url", url,
-		"status", resp.StatusCode,
-		"response", responseData)
-
+	slog.Info("form submitted successfully", "url", url, "status", resp.StatusCode, "response", responseData)
 	return responseData, nil
 }
 
