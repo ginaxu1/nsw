@@ -34,6 +34,7 @@ export default defineConfig({
         '@jsonforms/core',
         '@jsonforms/react',
         '@radix-ui/themes',
+        '@radix-ui/react-icons',
       ]
     }
   }
