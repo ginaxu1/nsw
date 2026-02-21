@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"gorm.io/gorm"
 
 	"github.com/OpenNSW/nsw/internal/workflow/model"
 )
@@ -36,6 +38,9 @@ func (m *MockTemplateProvider) GetWorkflowTemplateByID(ctx context.Context, id u
 
 func (m *MockTemplateProvider) GetWorkflowNodeTemplatesByIDs(ctx context.Context, ids []uuid.UUID) ([]model.WorkflowNodeTemplate, error) {
 	args := m.Called(ctx, ids)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
 	return args.Get(0).([]model.WorkflowNodeTemplate), args.Error(1)
 }
 
@@ -429,4 +434,143 @@ func TestConsignmentService_UpdateWorkflowNodeState_Completion(t *testing.T) {
 	newReadyNodes, _, err := service.UpdateWorkflowNodeStateAndPropagateChanges(ctx, updateReq)
 	assert.NoError(t, err)
 	assert.Empty(t, newReadyNodes) // No dependents
+}
+
+func TestConsignmentService_InitializeConsignment_Failure(t *testing.T) {
+	db, _ := setupTestDB(t)
+	mockTemplateProvider := new(MockTemplateProvider)
+	mockNodeRepo := new(MockWorkflowNodeRepository)
+
+	service := NewConsignmentService(db, mockTemplateProvider, mockNodeRepo)
+	ctx := context.Background()
+	hsCodeID := uuid.New()
+	createReq := &model.CreateConsignmentDTO{
+		Flow: model.ConsignmentFlowImport,
+		Items: []model.CreateConsignmentItemDTO{
+			{HSCodeID: hsCodeID},
+		},
+	}
+
+	t.Run("Template Not Found", func(t *testing.T) {
+		mockTemplateProvider.On("GetWorkflowTemplateByHSCodeIDAndFlow", ctx, hsCodeID, model.ConsignmentFlowImport).Return(nil, errors.New("template not found")).Once()
+
+		resp, nodes, err := service.InitializeConsignment(ctx, createReq, "trader1", nil)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get workflow template")
+		assert.Nil(t, resp)
+		assert.Nil(t, nodes)
+	})
+
+	t.Run("Node Templates Fetch Error", func(t *testing.T) {
+		db, sqlMock := setupTestDB(t)
+		mockTemplateProvider := new(MockTemplateProvider)
+		mockNodeRepo := new(MockWorkflowNodeRepository)
+		service := NewConsignmentService(db, mockTemplateProvider, mockNodeRepo)
+
+		localHSCodeID := uuid.New()
+		localCreateReq := &model.CreateConsignmentDTO{
+			Flow: model.ConsignmentFlowImport,
+			Items: []model.CreateConsignmentItemDTO{
+				{HSCodeID: localHSCodeID},
+			},
+		}
+
+		workflowTemplate := &model.WorkflowTemplate{
+			BaseModel:     model.BaseModel{ID: uuid.New()},
+			NodeTemplates: model.UUIDArray{uuid.New()},
+		}
+		mockTemplateProvider.On("GetWorkflowTemplateByHSCodeIDAndFlow", mock.Anything, localHSCodeID, model.ConsignmentFlowImport).Return(workflowTemplate, nil).Once()
+
+		sqlMock.ExpectBegin()
+		sqlMock.ExpectExec(`INSERT INTO "consignments"`).WillReturnResult(sqlmock.NewResult(1, 1))
+
+		mockTemplateProvider.On("GetWorkflowNodeTemplatesByIDs", mock.Anything, mock.MatchedBy(func(ids []uuid.UUID) bool {
+			return len(ids) == 1 && ids[0] == workflowTemplate.NodeTemplates[0]
+		})).Return(nil, errors.New("fetch error")).Once()
+		sqlMock.ExpectRollback()
+
+		resp, nodes, err := service.InitializeConsignment(context.Background(), localCreateReq, "trader1", nil)
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), "failed to create workflow nodes")
+			assert.Contains(t, err.Error(), "failed to retrieve workflow node templates")
+		}
+		assert.Nil(t, resp)
+		assert.Nil(t, nodes)
+		sqlMock.ExpectationsWereMet()
+	})
+}
+
+func TestConsignmentService_UpdateConsignment_Failure(t *testing.T) {
+	db, sqlMock := setupTestDB(t)
+	mockTemplateProvider := new(MockTemplateProvider)
+	mockNodeRepo := new(MockWorkflowNodeRepository)
+
+	service := NewConsignmentService(db, mockTemplateProvider, mockNodeRepo)
+	ctx := context.Background()
+	consignmentID := uuid.New()
+	state := model.ConsignmentStateFinished
+	updateReq := &model.UpdateConsignmentDTO{
+		ConsignmentID: consignmentID,
+		State:         &state,
+	}
+
+	t.Run("Consignment Not Found", func(t *testing.T) {
+		sqlMock.ExpectQuery(`SELECT \* FROM "consignments" WHERE id = \$1`).
+			WithArgs(consignmentID, 1).
+			WillReturnError(gorm.ErrRecordNotFound)
+
+		resp, err := service.UpdateConsignment(ctx, updateReq)
+		assert.Error(t, err)
+		assert.Nil(t, resp)
+	})
+
+	t.Run("Update DB Error", func(t *testing.T) {
+		sqlMock.ExpectQuery(`SELECT \* FROM "consignments" WHERE id = \$1`).
+			WithArgs(consignmentID, 1).
+			WillReturnRows(sqlmock.NewRows([]string{"id", "state"}).AddRow(consignmentID, "IN_PROGRESS"))
+
+		sqlMock.ExpectBegin()
+		sqlMock.ExpectExec(`UPDATE "consignments"`).WillReturnError(errors.New("db error"))
+		sqlMock.ExpectRollback()
+
+		resp, err := service.UpdateConsignment(ctx, updateReq)
+		assert.Error(t, err)
+		assert.Nil(t, resp)
+	})
+}
+
+func TestConsignmentService_GetConsignmentsByTraderID_EdgeCases(t *testing.T) {
+	db, sqlMock := setupTestDB(t)
+	service := NewConsignmentService(db, nil, nil)
+	ctx := context.Background()
+	traderID := "trader1"
+
+	t.Run("Empty Results", func(t *testing.T) {
+		sqlMock.ExpectQuery(`SELECT count\(\*\) FROM "consignments" WHERE trader_id = \$1`).
+			WithArgs(traderID).
+			WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+
+		sqlMock.ExpectQuery(`SELECT \* FROM "consignments" WHERE trader_id = \$1`).
+			WithArgs(traderID, 10).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}))
+
+		limit := 10
+		offset := 0
+		result, err := service.GetConsignmentsByTraderID(ctx, traderID, &offset, &limit, model.ConsignmentFilter{})
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.Equal(t, int64(0), result.TotalCount)
+		assert.Empty(t, result.Items)
+	})
+
+	t.Run("Count Error", func(t *testing.T) {
+		sqlMock.ExpectQuery(`SELECT count\(\*\) FROM "consignments"`).
+			WillReturnError(errors.New("count error"))
+
+		limit := 10
+		offset := 0
+		result, err := service.GetConsignmentsByTraderID(ctx, traderID, &offset, &limit, model.ConsignmentFilter{})
+		assert.Error(t, err)
+		assert.Nil(t, result)
+	})
 }

@@ -29,12 +29,9 @@ type MockTaskFactory struct {
 
 func (m *MockTaskFactory) BuildExecutor(ctx context.Context, taskType plugin.Type, config json.RawMessage) (plugin.Executor, error) {
 	args := m.Called(ctx, taskType, config)
-<<<<<<< HEAD
-=======
 	if args.Get(0) == nil {
 		return plugin.Executor{}, args.Error(1)
 	}
->>>>>>> 8b72995 (Unit tests for Workflow Manager)
 	return args.Get(0).(plugin.Executor), args.Error(1)
 }
 
@@ -171,8 +168,6 @@ func TestInitTask(t *testing.T) {
 			GlobalState:            map[string]any{},
 		}
 
-<<<<<<< HEAD
-=======
 		// Pre-populate cache
 		mockPlugin.On("Init", mock.Anything).Return().Once()
 
@@ -208,7 +203,6 @@ func TestInitTask(t *testing.T) {
 			GlobalState:            map[string]any{},
 		}
 
->>>>>>> 8b72995 (Unit tests for Workflow Manager)
 		mockFactory.On("BuildExecutor", ctx, req.Type, req.Config).Return(plugin.Executor{Plugin: mockPlugin}, nil).Once()
 		mockStore.On("GetLocalState", req.TaskID).Return(json.RawMessage(`{}`), nil).Once()
 		mockStore.On("GetPluginState", req.TaskID).Return("", nil).Once()
@@ -556,7 +550,7 @@ func TestGetTask_CacheRebuild(t *testing.T) {
 		// Act
 		result, err := tm.getTask(context.Background(), taskID)
 		assert.NoError(t, err)
-		assert.Equal(t, c, result)
+		assert.Equal(t, container, result)
 	})
 
 	t.Run("Cache Miss Rebuild Success", func(t *testing.T) {

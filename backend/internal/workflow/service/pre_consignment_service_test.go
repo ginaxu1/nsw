@@ -431,3 +431,82 @@ func TestPreConsignmentService_SyncTraderContext(t *testing.T) {
 	_, _, err := service.UpdateWorkflowNodeStateAndPropagateChanges(ctx, updateReq)
 	assert.NoError(t, err)
 }
+
+func TestPreConsignmentService_InitializePreConsignment_Failure(t *testing.T) {
+	db, sqlMock := setupTestDB(t)
+	mockTemplateProvider := new(MockTemplateProvider)
+	mockNodeRepo := new(MockWorkflowNodeRepository)
+	service := NewPreConsignmentService(db, mockTemplateProvider, mockNodeRepo)
+	ctx := context.Background()
+	templateID := uuid.New()
+	createReq := &model.CreatePreConsignmentDTO{
+		PreConsignmentTemplateID: templateID,
+	}
+
+	t.Run("Template Not Found", func(t *testing.T) {
+		sqlMock.ExpectQuery(`SELECT \* FROM "pre_consignment_templates" WHERE id = \$1 ORDER BY "pre_consignment_templates"."id" LIMIT \$2`).
+			WithArgs(templateID, 1).
+			WillReturnError(gorm.ErrRecordNotFound)
+
+		resp, nodes, err := service.InitializePreConsignment(ctx, createReq, "trader1", nil)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "not found")
+		assert.Nil(t, resp)
+		assert.Nil(t, nodes)
+	})
+
+	t.Run("Workflow Template Not Found", func(t *testing.T) {
+		workflowTemplateID := uuid.New()
+		sqlMock.ExpectQuery(`SELECT \* FROM "pre_consignment_templates" WHERE id = \$1 ORDER BY "pre_consignment_templates"."id" LIMIT \$2`).
+			WithArgs(templateID, 1).
+			WillReturnRows(sqlmock.NewRows([]string{"id", "workflow_template_id", "depends_on"}).
+				AddRow(templateID, workflowTemplateID, []byte("[]")))
+
+		mockTemplateProvider.On("GetWorkflowTemplateByID", ctx, workflowTemplateID).Return(nil, errors.New("wf error")).Once()
+
+		resp, nodes, err := service.InitializePreConsignment(ctx, createReq, "trader1", nil)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get workflow template")
+		assert.Nil(t, resp)
+		assert.Nil(t, nodes)
+	})
+}
+
+func TestPreConsignmentService_GetTraderPreConsignments_Failure(t *testing.T) {
+	db, sqlMock := setupTestDB(t)
+	service := NewPreConsignmentService(db, nil, nil)
+	ctx := context.Background()
+	traderID := "trader1"
+
+	t.Run("Count Error", func(t *testing.T) {
+		sqlMock.ExpectQuery(`SELECT count\\(\*\\) FROM "pre_consignment_templates"`).
+			WillReturnError(errors.New("db error"))
+
+		result, err := service.GetTraderPreConsignments(ctx, traderID, nil, nil)
+		assert.Error(t, err)
+		assert.Equal(t, model.TraderPreConsignmentsResponseDTO{}, result)
+	})
+}
+
+func TestPreConsignmentService_UpdateWorkflowNodeState_Failure(t *testing.T) {
+	db, sqlMock := setupTestDB(t)
+	mockNodeRepo := new(MockWorkflowNodeRepository)
+	service := NewPreConsignmentService(db, nil, mockNodeRepo)
+	ctx := context.Background()
+	nodeID := uuid.New()
+	updateReq := &model.UpdateWorkflowNodeDTO{
+		WorkflowNodeID: nodeID,
+		State:          model.WorkflowNodeStateInProgress,
+	}
+
+	t.Run("DB Error on Node Retrieval", func(t *testing.T) {
+		sqlMock.ExpectBegin()
+		mockNodeRepo.On("GetWorkflowNodeByIDInTx", ctx, mock.Anything, nodeID).Return(nil, errors.New("db error")).Once()
+		sqlMock.ExpectRollback()
+
+		nodes, context, err := service.UpdateWorkflowNodeStateAndPropagateChanges(ctx, updateReq)
+		assert.Error(t, err)
+		assert.Nil(t, nodes)
+		assert.Nil(t, context)
+	})
+}

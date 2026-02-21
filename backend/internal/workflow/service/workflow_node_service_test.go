@@ -7,6 +7,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"gorm.io/gorm"
 
 	"github.com/OpenNSW/nsw/internal/workflow/model"
 )
@@ -210,4 +211,42 @@ func TestWorkflowNodeService_GetWorkflowNodeByID(t *testing.T) {
 	node, err := service.GetWorkflowNodeByID(ctx, id)
 	assert.NoError(t, err)
 	assert.Equal(t, id, node.ID)
+}
+
+func TestWorkflowNodeService_UpdateWorkflowNodesInTx_Failure(t *testing.T) {
+	db, sqlMock := setupTestDB(t)
+	service := NewWorkflowNodeService(db)
+	ctx := context.Background()
+	sqlMock.ExpectBegin()
+	tx := db.Begin()
+
+	nodeID := uuid.New()
+	nodes := []model.WorkflowNode{{BaseModel: model.BaseModel{ID: nodeID}}}
+
+	t.Run("Node Not Found", func(t *testing.T) {
+		sqlMock.ExpectQuery(`SELECT \* FROM "workflow_nodes" WHERE id = \$1 ORDER BY "workflow_nodes"."id" LIMIT \$2`).
+			WithArgs(nodeID, 1).
+			WillReturnError(gorm.ErrRecordNotFound)
+
+		err := service.UpdateWorkflowNodesInTx(ctx, tx, nodes)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to find workflow node")
+	})
+}
+
+func TestWorkflowNodeService_GetWorkflowNodeByID_Failure(t *testing.T) {
+	db, sqlMock := setupTestDB(t)
+	service := NewWorkflowNodeService(db)
+	ctx := context.Background()
+	id := uuid.New()
+
+	t.Run("Not Found", func(t *testing.T) {
+		sqlMock.ExpectQuery(`SELECT \* FROM "workflow_nodes" WHERE id = \$1 ORDER BY "workflow_nodes"."id" LIMIT \$2`).
+			WithArgs(id, 1).
+			WillReturnError(gorm.ErrRecordNotFound)
+
+		node, err := service.GetWorkflowNodeByID(ctx, id)
+		assert.Error(t, err)
+		assert.Nil(t, node)
+	})
 }
