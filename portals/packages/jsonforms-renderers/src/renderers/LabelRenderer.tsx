@@ -1,5 +1,4 @@
-import { type LabelElement, type RankedTester, rankWith, uiTypeIs } from '@jsonforms/core';
-import { withJsonFormsLayoutProps } from '@jsonforms/react';
+import { type RankedTester, rankWith, uiTypeIs, type LabelElement } from '@jsonforms/core';
 import { Heading, Box } from '@radix-ui/themes';
 
 export const LabelRenderer = ({ uischema, visible }: any) => {
@@ -18,4 +17,4 @@ export const LabelRenderer = ({ uischema, visible }: any) => {
 
 export const LabelTester: RankedTester = rankWith(1, uiTypeIs('Label'));
 
-export default withJsonFormsLayoutProps(LabelRenderer);
+export default LabelRenderer;
