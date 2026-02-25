@@ -58,6 +58,7 @@ type GetRenderInfoResponse struct {
 type ExecutionResponse struct {
 	NewState            *State
 	ExtendedState       *string
+	Outcome             *string
 	AppendGlobalContext map[string]any
 	Message             string
 	ApiResponse         *ApiResponse

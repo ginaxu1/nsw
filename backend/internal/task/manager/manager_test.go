@@ -469,7 +469,7 @@ func TestNotifyWorkflowManager(t *testing.T) {
 			completionChan: nil,
 		}
 		// Should not panic
-		tm.notifyWorkflowManager(context.Background(), uuid.New(), nil, nil, nil)
+		tm.notifyWorkflowManager(context.Background(), uuid.New(), nil, nil, nil, nil)
 	})
 
 	t.Run("Channel Default Send", func(t *testing.T) {
@@ -479,7 +479,7 @@ func TestNotifyWorkflowManager(t *testing.T) {
 		}
 		taskID := uuid.New()
 		state := plugin.Completed
-		tm.notifyWorkflowManager(context.Background(), taskID, &state, nil, nil)
+		tm.notifyWorkflowManager(context.Background(), taskID, &state, nil, nil, nil)
 
 		select {
 		case n := <-ch:
@@ -500,7 +500,7 @@ func TestNotifyWorkflowManager(t *testing.T) {
 
 		// Attempt verify non-blocking drop
 		taskID := uuid.New()
-		tm.notifyWorkflowManager(context.Background(), taskID, nil, nil, nil)
+		tm.notifyWorkflowManager(context.Background(), taskID, nil, nil, nil, nil)
 
 		assert.Len(t, ch, 1) // Should still have 1 item
 	})
