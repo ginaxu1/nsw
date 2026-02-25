@@ -269,7 +269,7 @@ func (tm *taskManager) start(ctx context.Context, activeTask *container.Containe
 
 	// Notify the workflow manager of the initial state after starting the task (e.g., InProgress). This ensures that
 	//the workflow manager is aware of the task's state change immediately after initialization.
-	tm.notifyWorkflowManager(ctx, activeTask.TaskID, result.NewState, result.ExtendedState, result.AppendGlobalContext)
+	tm.notifyWorkflowManager(ctx, activeTask.TaskID, result.NewState, result.ExtendedState, result.AppendGlobalContext, result.Outcome)
 
 	return &InitTaskResponse{Success: true}, nil
 }
@@ -283,7 +283,7 @@ func (tm *taskManager) execute(ctx context.Context, activeTask *container.Contai
 	}
 
 	if result.NewState != nil {
-		tm.notifyWorkflowManager(ctx, activeTask.TaskID, result.NewState, result.ExtendedState, result.AppendGlobalContext)
+		tm.notifyWorkflowManager(ctx, activeTask.TaskID, result.NewState, result.ExtendedState, result.AppendGlobalContext, result.Outcome)
 	}
 
 	return result, nil
@@ -368,7 +368,7 @@ func (tm *taskManager) getTask(ctx context.Context, taskID uuid.UUID) (*containe
 }
 
 // notifyWorkflowManager sends notification to Workflow Manager via Go channel
-func (tm *taskManager) notifyWorkflowManager(ctx context.Context, taskID uuid.UUID, state *plugin.State, extendedState *string, appendGlobalContext map[string]any) {
+func (tm *taskManager) notifyWorkflowManager(ctx context.Context, taskID uuid.UUID, state *plugin.State, extendedState *string, appendGlobalContext map[string]any, outcome *string) {
 	if tm.completionChan == nil {
 		slog.WarnContext(ctx, "completion channel not configured, skipping notification",
 			"taskID", taskID,
@@ -384,6 +384,7 @@ func (tm *taskManager) notifyWorkflowManager(ctx context.Context, taskID uuid.UU
 		UpdatedState:        state,
 		ExtendedState:       extendedState,
 		AppendGlobalContext: appendGlobalContext,
+		Outcome:             outcome,
 	}
 
 	// Non-blocking send - if a channel is full, log warning but don't block
