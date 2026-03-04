@@ -15,6 +15,12 @@ import { FileControlTester } from './FileControlTester';
 import ArrayControl from './ArrayControl';
 import { ArrayControlTester } from './ArrayControlTester';
 import LabelRenderer, { LabelTester } from './LabelRenderer';
+import { rankWith, isPrimitiveArrayControl } from '@jsonforms/core';
+
+const PrimitiveArrayControlTester = rankWith(
+    3,
+    isPrimitiveArrayControl
+);
 
 export const radixRenderers = [
     { tester: TextControlTester, renderer: TextControl },
@@ -28,6 +34,7 @@ export const radixRenderers = [
     { tester: CategorizationLayoutTester, renderer: CategorizationLayoutRenderer },
     { tester: FileControlTester, renderer: FileControl },
     { tester: ArrayControlTester, renderer: ArrayControl },
+    { tester: PrimitiveArrayControlTester, renderer: ArrayControl },
     { tester: LabelTester, renderer: LabelRenderer },
 ];
 

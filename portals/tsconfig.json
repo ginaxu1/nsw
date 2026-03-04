@@ -4,6 +4,9 @@
     "paths": {
       "@lsf/ui": [
         "ui/src"
+      ],
+      "@opennsw/jsonforms-renderers": [
+        "packages/jsonforms-renderers/src"
       ]
     }
   },

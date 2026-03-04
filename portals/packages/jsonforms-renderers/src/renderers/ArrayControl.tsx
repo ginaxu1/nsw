@@ -1,4 +1,4 @@
-import { createDefaultValue, type ArrayControlProps } from '@jsonforms/core';
+import { createDefaultValue, type ArrayControlProps, type JsonSchema } from '@jsonforms/core';
 import { withJsonFormsArrayControlProps, JsonFormsDispatch } from '@jsonforms/react';
 import { Card, Button, Flex, Text, Box } from '@radix-ui/themes';
 import { PlusIcon, TrashIcon } from '@radix-ui/react-icons';
@@ -13,25 +13,28 @@ export const ArrayControl = ({
     addItem,
     removeItems,
     rootSchema,
-}: Omit<ArrayControlProps, 'addItem'> & { addItem?: (path: string, value: any) => void; }) => {
-    const itemsSchema = schema.items;
+    arraySchema,
+}: ArrayControlProps) => {
+    // If `arraySchema` is present, `schema` is already our `itemsSchema`, else fall back to `schema.items`
+    const itemsSchema = arraySchema ? schema : schema.items;
+    const actualArraySchema = arraySchema || schema;
 
     if (visible === false) {
         return null;
     }
     if (!itemsSchema || typeof itemsSchema !== 'object' || Array.isArray(itemsSchema)) {
-        return null; // Or render a more descriptive error message
+        return null;
     }
 
     // After the guard, we know itemsSchema is a valid single JsonSchema object
-    const validItemsSchema = itemsSchema as import('@jsonforms/core').JsonSchema;
+    const validItemsSchema = itemsSchema as JsonSchema;
 
     const items = Array.isArray(data) ? data : [];
-    const title = schema.title || 'Array Items';
+    const title = actualArraySchema.title || 'Array Items';
 
     const handleAddItem = () => {
         const newItem = createDefaultValue(validItemsSchema, rootSchema);
-        if (addItem) addItem(path, newItem);
+        if (addItem) addItem(path, newItem)();
     };
 
     const handleRemoveItem = (indexToRemove: number) => {
@@ -80,15 +83,20 @@ export const ArrayControl = ({
                                     <JsonFormsDispatch
                                         schema={validItemsSchema}
                                         uischema={
-                                            uischema.options?.detail || {
-                                                type: 'VerticalLayout',
-                                                elements: Object.keys(
-                                                    validItemsSchema.properties || {}
-                                                ).map((key) => ({
+                                            uischema.options?.detail || (
+                                                validItemsSchema.type === 'object' || validItemsSchema.properties ? {
+                                                    type: 'VerticalLayout',
+                                                    elements: Object.keys(
+                                                        validItemsSchema.properties || {}
+                                                    ).map((key) => ({
+                                                        type: 'Control',
+                                                        scope: `#/properties/${key}`,
+                                                    })),
+                                                } : {
                                                     type: 'Control',
-                                                    scope: `#/properties/${key}`,
-                                                })),
-                                            }
+                                                    scope: '#',
+                                                }
+                                            )
                                         }
                                         path={childPath}
                                         enabled={enabled}
