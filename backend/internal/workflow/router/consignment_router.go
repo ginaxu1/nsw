@@ -148,8 +148,15 @@ func (c *ConsignmentRouter) HandleGetConsignmentByID(w http.ResponseWriter, r *h
 }
 
 // HandleListCHAs handles GET /api/v1/chas
-// Response: []model.ClearingHouseAgent
+// Response: []model.CustomsHouseAgent
 func (c *ConsignmentRouter) HandleListCHAs(w http.ResponseWriter, r *http.Request) {
+	// Require authentication
+	authCtx := auth.GetAuthContext(r.Context())
+	if authCtx == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	chas, err := c.cs.ListCHAs(r.Context())
 	if err != nil {
 		http.Error(w, "failed to retrieve CHAs: "+err.Error(), http.StatusInternalServerError)

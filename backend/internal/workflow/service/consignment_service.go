@@ -75,7 +75,7 @@ func (s *ConsignmentService) initializeConsignmentInTx(ctx context.Context, crea
 		TraderID:      traderId,
 		State:         model.ConsignmentStateInProgress,
 		GlobalContext: globalContext,
-		CHAID:         &createReq.CHAID,
+		CHAID:         createReq.CHAID,
 	}
 
 	var items []model.ConsignmentItem
@@ -201,8 +201,20 @@ func (s *ConsignmentService) createWorkflowNodesInTx(ctx context.Context, tx *go
 // GetConsignmentByID retrieves a consignment by its ID from the database.
 func (s *ConsignmentService) GetConsignmentByID(ctx context.Context, consignmentID uuid.UUID) (*model.ConsignmentDetailDTO, error) {
 	var consignment model.Consignment
-	// Use Preload to fetch WorkflowNodes and their templates in a single query
-	result := s.db.WithContext(ctx).Preload("WorkflowNodes.WorkflowNodeTemplate").Preload("CHA").First(&consignment, "id = ?", consignmentID)
+
+	userRole := auth.GetRole(ctx)
+	traderIDAuth := auth.GetUserID(ctx)
+	chaID := auth.GetAgencyID(ctx)
+
+	baseQuery := s.db.WithContext(ctx).Preload("WorkflowNodes.WorkflowNodeTemplate").Preload("CHA")
+
+	if userRole == "CHA" {
+		baseQuery = baseQuery.Where("cha_id = ?", chaID)
+	} else {
+		baseQuery = baseQuery.Where("trader_id = ?", traderIDAuth)
+	}
+
+	result := baseQuery.First(&consignment, "id = ?", consignmentID)
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to retrieve consignment with ID %s: %w", consignmentID, result.Error)
 	}
@@ -237,7 +249,13 @@ func (s *ConsignmentService) GetConsignments(ctx context.Context, offset *int, l
 
 	// Apply filtering based on role
 	if userRole == "CHA" {
-		baseQuery = baseQuery.Where("cha_id = ?", chaID)
+		if chaID == "" {
+			// A CHA user must have an agency ID. To prevent a query error with an invalid
+			// UUID, we can force the query to return no results.
+			baseQuery = baseQuery.Where("1 = 0")
+		} else {
+			baseQuery = baseQuery.Where("cha_id = ?", chaID)
+		}
 	} else {
 		// Default to Trader filtering
 		baseQuery = baseQuery.Where("trader_id = ?", traderIDAuth)
@@ -273,7 +291,6 @@ func (s *ConsignmentService) GetConsignments(ctx context.Context, offset *int, l
 	query = query.
 		Offset(finalOffset).
 		Limit(finalLimit).
-		Preload("CHA").
 		Order("created_at DESC")
 
 	if err := query.Find(&consignments).Error; err != nil {
@@ -372,7 +389,20 @@ func (s *ConsignmentService) UpdateConsignment(ctx context.Context, updateReq *m
 	}
 
 	var consignment model.Consignment
-	result := s.db.WithContext(ctx).First(&consignment, "id = ?", updateReq.ConsignmentID)
+
+	userRole := auth.GetRole(ctx)
+	traderIDAuth := auth.GetUserID(ctx)
+	chaID := auth.GetAgencyID(ctx)
+
+	query := s.db.WithContext(ctx)
+
+	if userRole == "CHA" {
+		query = query.Where("cha_id = ?", chaID)
+	} else {
+		query = query.Where("trader_id = ?", traderIDAuth)
+	}
+
+	result := query.First(&consignment, "id = ?", updateReq.ConsignmentID)
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to retrieve consignment with ID %s for update: %w", updateReq.ConsignmentID, result.Error)
 	}
@@ -665,9 +695,9 @@ func (s *ConsignmentService) buildConsignmentItemResponseDTOs(items []model.Cons
 	return itemResponseDTOs, nil
 }
 
-// ListCHAs retrieves all registered ClearingHouseAgents.
-func (s *ConsignmentService) ListCHAs(ctx context.Context) ([]model.ClearingHouseAgent, error) {
-	var chas []model.ClearingHouseAgent
+// ListCHAs retrieves all registered CustomsHouseAgents.
+func (s *ConsignmentService) ListCHAs(ctx context.Context) ([]model.CustomsHouseAgent, error) {
+	var chas []model.CustomsHouseAgent
 	if err := s.db.WithContext(ctx).Find(&chas).Error; err != nil {
 		return nil, fmt.Errorf("failed to retrieve CHAs: %w", err)
 	}
