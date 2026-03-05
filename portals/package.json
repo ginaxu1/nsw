@@ -8,7 +8,7 @@
     "pnpm": ">=10.28.1"
   },
   "scripts": {
-    "build": "pnpm --recursive --parallel run build",
+    "build": "pnpm --recursive run build",
     "dev-oga": "pnpm --filter oga-app dev",
     "dev-trader": "pnpm --filter trader-app dev",
     "lint": "pnpm --recursive --parallel run lint",

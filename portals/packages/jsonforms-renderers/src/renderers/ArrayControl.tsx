@@ -68,6 +68,7 @@ export const ArrayControl = ({
                                     </Text>
                                     {enabled && (
                                         <Button
+                                            type="button"
                                             color="red"
                                             variant="soft"
                                             onClick={() => handleRemoveItem(index)}
@@ -112,6 +113,7 @@ export const ArrayControl = ({
                 {enabled && (
                     <Box mt="2">
                         <Button
+                            type="button"
                             variant="surface"
                             onClick={handleAddItem}
                         >
