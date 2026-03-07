@@ -1,17 +1,15 @@
 import { createContext, useContext, useMemo, useState, useEffect, type ReactNode } from 'react'
-import { useAsgardeo } from '@asgardeo/react'
+import { useAsgardeo } from '@asgardeo/react';
+import { jwtDecode } from 'jwt-decode';
 
 export type UserRole = 'TRADER' | 'CHA'
 
 function getRoleFromToken(token: string | null | undefined): UserRole {
-  if (!token || typeof token !== 'string') return 'TRADER'
+  if (!token) {
+    return 'TRADER'
+  }
   try {
-    const parts = token.split('.')
-    if (parts.length !== 3) return 'TRADER'
-    const payload = parts[1]
-    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/')
-    const json = atob(base64)
-    const decoded = JSON.parse(json) as { role?: string }
+    const decoded = jwtDecode<{ role?: string }>(token)
     if (decoded.role === 'CHA') return 'CHA'
     return 'TRADER'
   } catch {

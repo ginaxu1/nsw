@@ -138,7 +138,7 @@ export async function apiPut<T, R>(
 
   const text = await response.text()
   if (!text) {
-    return {} as R
+    throw new Error('API returned empty response')
   }
 
   try {

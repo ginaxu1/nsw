@@ -85,21 +85,23 @@ func (s *ConsignmentService) InitializeConsignment(ctx context.Context, consignm
 		return nil, nil, fmt.Errorf("initialization must have at least one item")
 	}
 
-	// Start a transaction
-	tx := s.db.WithContext(ctx).Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
+	// Lock the consignment for update with access control
+	userRole := auth.GetRole(ctx)
+	traderIDAuth := auth.GetUserID(ctx)
+	chaID := auth.GetAgencyID(ctx)
 
-	// Lock the consignment for update
+	query := tx.Set("gorm:query_option", "FOR UPDATE")
+	if userRole == "CHA" {
+		query = query.Where("cha_id = ?", chaID)
+	} else {
+		query = query.Where("trader_id = ?", traderIDAuth)
+	}
+
 	var consignment model.Consignment
-	if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&consignment, "id = ?", consignmentID).Error; err != nil {
+	if err := query.First(&consignment, "id = ?", consignmentID).Error; err != nil {
 		tx.Rollback()
 		return nil, nil, fmt.Errorf("failed to retrieve consignment for initialization: %w", err)
 	}
-
 	// Ensure the consignment is in the correct state
 	if consignment.State != model.ConsignmentStateAwaitingInitiation {
 		tx.Rollback()
@@ -168,93 +170,6 @@ func (s *ConsignmentService) InitializeConsignment(ctx context.Context, consignm
 	responseDTO, err := s.buildConsignmentDetailDTO(ctx, &consignment, hsLoader)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to build initialization response: %w", err)
-	}
-
-	return responseDTO, newReadyWorkflowNodes, nil
-}
-
-// initializeConsignmentInTx initializes the consignment within a transaction.
-func (s *ConsignmentService) initializeConsignmentInTx(ctx context.Context, createReq *model.CreateConsignmentDTO, traderId string, globalContext map[string]any) (*model.ConsignmentDetailDTO, []model.WorkflowNode, error) {
-	consignment := &model.Consignment{
-		Flow:          createReq.Flow,
-		TraderID:      traderId,
-		State:         model.ConsignmentStateInProgress,
-		GlobalContext: globalContext,
-		CHAID:         createReq.CHAID,
-	}
-
-	var items []model.ConsignmentItem
-	var workflowTemplates []model.WorkflowTemplate
-	for _, itemDTO := range createReq.Items {
-		item := model.ConsignmentItem(itemDTO)
-		items = append(items, item)
-		workflowTemplate, err := s.templateProvider.GetWorkflowTemplateByHSCodeIDAndFlow(ctx, itemDTO.HSCodeID, createReq.Flow)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to get workflow template for HS code %s and flow %s: %w", itemDTO.HSCodeID, createReq.Flow, err)
-		}
-		workflowTemplates = append(workflowTemplates, *workflowTemplate)
-	}
-	consignment.Items = items
-
-	// Initiate Transaction
-	tx := s.db.WithContext(ctx).Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
-
-	// Create Consignment
-	if err := tx.Create(consignment).Error; err != nil {
-		tx.Rollback()
-		return nil, nil, fmt.Errorf("failed to create consignment: %w", err)
-	}
-
-	// Create Workflow Nodes
-	_, newReadyWorkflowNodes, endNodeID, err := s.createWorkflowNodesInTx(ctx, tx, consignment.ID, workflowTemplates)
-	if err != nil {
-		tx.Rollback()
-		return nil, nil, fmt.Errorf("failed to create workflow nodes: %w", err)
-	}
-
-	if endNodeID != nil {
-		consignment.EndNodeID = endNodeID
-		if err := tx.Save(consignment).Error; err != nil {
-			tx.Rollback()
-			return nil, nil, fmt.Errorf("failed to update consignment with end node ID: %w", err)
-		}
-	}
-
-	// Execute pre-commit validation callback if set (e.g., task manager registration)
-	// This ensures external dependencies are validated before committing the transaction
-	if s.preCommitValidationCallback != nil && len(newReadyWorkflowNodes) > 0 {
-		if err := s.preCommitValidationCallback(newReadyWorkflowNodes, consignment.GlobalContext); err != nil {
-			tx.Rollback()
-			return nil, nil, fmt.Errorf("pre-commit validation failed: %w", err)
-		}
-	}
-
-	// Commit Transaction
-	if err := tx.Commit().Error; err != nil {
-		tx.Rollback()
-		return nil, nil, fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	// Reload consignment with preloaded relationships for response building
-	if err := s.db.WithContext(ctx).Preload("WorkflowNodes.WorkflowNodeTemplate").Preload("CHA").First(consignment, "id = ?", consignment.ID).Error; err != nil {
-		return nil, nil, fmt.Errorf("failed to reload consignment with relationships: %w", err)
-	}
-
-	// Prepare Response DTO using the helper function
-	hsLoader := newHSCodeBatchLoader(s.db)
-	hsLoader.collectFromItems(consignment.Items)
-	if err := hsLoader.load(ctx); err != nil {
-		return nil, nil, fmt.Errorf("failed to load HS codes: %w", err)
-	}
-
-	responseDTO, err := s.buildConsignmentDetailDTO(ctx, consignment, hsLoader)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to build consignment response DTO: %w", err)
 	}
 
 	return responseDTO, newReadyWorkflowNodes, nil
