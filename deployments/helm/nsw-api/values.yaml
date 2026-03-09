@@ -3,38 +3,58 @@
 replicaCount: 1
 
 image:
-  repository: image-registry.openshift-image-registry.svc:5000/your-project/nsw-api
+  repository: ghcr.io/opennsw/nsw-api
   pullPolicy: IfNotPresent
-  # Use an immutable image tag for predictable rollouts and rollbacks.
-  # Update this when you cut a new backend image.
-  tag: "0.1.0"
+  tag: latest
+
+imagePullSecrets:
+  - name: ghcr-pull-secret
 
 service:
   type: ClusterIP
   port: 80
-  targetPort: 8080   # matches Dockerfile EXPOSE 8080
+  targetPort: 8080
 
 config:
+  server:
+    port: 8080
+    debug: false
+    logLevel: "info"
+
   database:
-    host: "10.x.x.x"     # NSW Core DB VM host/IP
+    host: "nsw-db"
     port: 5432
     name: "nsw_db"
     username: "postgres"
     # password comes from Secret: nsw-db-credentials.password
-    sslMode: "disable"   # or "require"
+    sslMode: "disable"
 
   auth:
-    jwksUrl: "https://idp-route.your-project.lgc.gov.lk/oauth2/jwks"
-    issuer: "https://idp-route.your-project.lgc.gov.lk"
-    audience: "TRADER_PORTAL_APP"      # must match Thunder app
+    jwksUrl: "https://idp-route.national-single-window-platform.lgc.gov.lk/oauth2/jwks"
+    issuer: "https://idp-route.national-single-window-platform.lgc.gov.lk"
+    audience: "TRADER_PORTAL_APP"
     clientId: "TRADER_PORTAL_APP"
+    insecureSkipTlsVerify: false
 
-  serviceUrl: "https://nsw-api-your-project.lgc.gov.lk"
+  serviceUrl: "https://nsw-api-national-single-window-platform.lgc.gov.lk"
 
   cors:
     allowedOrigins:
-      - "https://trader-portal-your-project.lgc.gov.lk"
-      - "https://npqs-portal-your-project.lgc.gov.lk"
+      - "https://trader-portal-national-single-window-platform.lgc.gov.lk"
+      - "https://npqs-portal-national-single-window-platform.lgc.gov.lk"
+
+  storage:
+    type: "local"
+    localBaseDir: "/tmp/bucket"
+    localPublicUrl: "/api/v1/uploads"
+    # S3 config — only used when storage.type is "s3"
+    s3Endpoint: ""
+    s3Bucket: "nsw-uploads"
+    s3Region: "us-east-1"
+    s3AccessKey: ""
+    s3SecretKey: ""
+    s3UseSsl: true
+    s3PublicUrl: ""
 
 resources:
   limits:
@@ -46,7 +66,8 @@ resources:
 
 route:
   enabled: true
-  host: nsw-api-your-project.lgc.gov.lk
+  # Leave empty to let OpenShift auto-assign; set explicitly only if your user has permission.
+  host: ""
   tls:
     enabled: true
     termination: edge

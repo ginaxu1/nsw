@@ -2,9 +2,9 @@
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: {{ include "nsw-api.fullname" . }}
+  name: {{ include "oga-app.fullname" . }}
   labels:
-    app.kubernetes.io/name: {{ include "nsw-api.name" . }}
+    app.kubernetes.io/name: {{ include "oga-app.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
   {{- if .Values.route.host }}
@@ -12,7 +12,7 @@ spec:
   {{- end }}
   to:
     kind: Service
-    name: {{ include "nsw-api.fullname" . }}
+    name: {{ include "oga-app.fullname" . }}
     weight: 100
   port:
     targetPort: http
