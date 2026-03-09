@@ -1,0 +1,27 @@
+# oga-npqs-values.yaml
+image:
+  repository: image-registry.openshift-image-registry.svc:5000/your-project/oga-app
+  # Use an immutable image tag (version or commit SHA) in non-dev clusters.
+  tag: "0.1.0"
+
+env:
+  # Switches the UI and logic to NPQS mode
+  - name: VITE_INSTANCE_CONFIG
+    value: "npqs"
+  
+  # The base URL of the specific OGA Backend for NPQS
+  - name: VITE_API_BASE_URL
+    value: "https://oga-npqs-api-your-project.lgc.gov.lk"
+  
+  # Identity Provider integration for NPQS officers
+  - name: VITE_IDP_BASE_URL
+    value: "https://idp-route-your-project.lgc.gov.lk"
+  - name: VITE_IDP_CLIENT_ID
+    value: "OGA_PORTAL_APP_NPQS" # Must match IDP bootstrap
+  - name: VITE_APP_URL
+    value: "https://npqs-portal-your-project.lgc.gov.lk"
+
+ingress:
+  enabled: true
+  hosts:
+    - host: npqs-portal-your-project.lgc.gov.lk

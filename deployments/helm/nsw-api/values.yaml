@@ -1,0 +1,53 @@
+# Default values for nsw-api.
+
+replicaCount: 1
+
+image:
+  repository: image-registry.openshift-image-registry.svc:5000/your-project/nsw-api
+  pullPolicy: IfNotPresent
+  # Use an immutable image tag for predictable rollouts and rollbacks.
+  # Update this when you cut a new backend image.
+  tag: "0.1.0"
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080   # matches Dockerfile EXPOSE 8080
+
+config:
+  database:
+    host: "10.x.x.x"     # NSW Core DB VM host/IP
+    port: 5432
+    name: "nsw_db"
+    username: "postgres"
+    # password comes from Secret: nsw-db-credentials.password
+    sslMode: "disable"   # or "require"
+
+  auth:
+    jwksUrl: "https://idp-route.your-project.lgc.gov.lk/oauth2/jwks"
+    issuer: "https://idp-route.your-project.lgc.gov.lk"
+    audience: "TRADER_PORTAL_APP"      # must match Thunder app
+    clientId: "TRADER_PORTAL_APP"
+
+  serviceUrl: "https://nsw-api-your-project.lgc.gov.lk"
+
+  cors:
+    allowedOrigins:
+      - "https://trader-portal-your-project.lgc.gov.lk"
+      - "https://npqs-portal-your-project.lgc.gov.lk"
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+route:
+  enabled: true
+  host: nsw-api-your-project.lgc.gov.lk
+  tls:
+    enabled: true
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

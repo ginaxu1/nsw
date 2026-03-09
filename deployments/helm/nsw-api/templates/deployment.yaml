@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nsw-api.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "nsw-api.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "nsw-api.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "nsw-api.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            # --- Database envs (internal/config/config.go) ---
+            - name: DB_HOST
+              value: {{ .Values.config.database.host | quote }}
+            - name: DB_PORT
+              value: {{ .Values.config.database.port | quote }}
+            - name: DB_USERNAME
+              value: {{ .Values.config.database.username | quote }}
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: nsw-db-credentials
+                  key: password
+            - name: DB_NAME
+              value: {{ .Values.config.database.name | quote }}
+            - name: DB_SSLMODE
+              value: {{ .Values.config.database.sslMode | quote }}
+
+            # --- Auth / OIDC envs ---
+            - name: AUTH_JWKS_URL
+              value: {{ .Values.config.auth.jwksUrl | quote }}
+            - name: AUTH_ISSUER
+              value: {{ .Values.config.auth.issuer | quote }}
+            - name: AUTH_AUDIENCE
+              value: {{ .Values.config.auth.audience | quote }}
+            - name: AUTH_CLIENT_ID
+              value: {{ .Values.config.auth.clientId | quote }}
+
+            # --- Service URL & CORS ---
+            - name: SERVICE_URL
+              value: {{ .Values.config.serviceUrl | quote }}
+            - name: CORS_ALLOWED_ORIGINS
+              value: {{ join "," .Values.config.cors.allowedOrigins | quote }}
+
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
