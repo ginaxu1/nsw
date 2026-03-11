@@ -24,9 +24,11 @@ type Manager struct {
 	preConsignmentService  *service.PreConsignmentService
 	workflowNodeService    *service.WorkflowNodeService
 	templateService        *service.TemplateService
+	chaService             *service.CHAService
 	hsCodeRouter           *router.HSCodeRouter
 	consignmentRouter      *router.ConsignmentRouter
 	preConsignmentRouter   *router.PreConsignmentRouter
+	chaRouter              *router.CHARouter
 	workflowNodeUpdateChan chan taskManager.WorkflowManagerNotification
 	ctx                    context.Context
 	cancel                 context.CancelFunc
@@ -40,6 +42,7 @@ func NewManager(tm taskManager.TaskManager, ch chan taskManager.WorkflowManagerN
 	templateService := service.NewTemplateService(db)
 	consignmentService := service.NewConsignmentService(db, templateService, workflowNodeService)
 	preConsignmentService := service.NewPreConsignmentService(db, templateService, workflowNodeService)
+	chaService := service.NewCHAService(db)
 
 	// Create context for lifecycle management
 	ctx, cancel := context.WithCancel(context.Background())
@@ -51,6 +54,7 @@ func NewManager(tm taskManager.TaskManager, ch chan taskManager.WorkflowManagerN
 		preConsignmentService:  preConsignmentService,
 		workflowNodeService:    workflowNodeService,
 		templateService:        templateService,
+		chaService:             chaService,
 		workflowNodeUpdateChan: ch,
 		ctx:                    ctx,
 		cancel:                 cancel,
@@ -64,6 +68,7 @@ func NewManager(tm taskManager.TaskManager, ch chan taskManager.WorkflowManagerN
 	m.hsCodeRouter = router.NewHSCodeRouter(hsCodeService)
 	m.consignmentRouter = router.NewConsignmentRouter(consignmentService, nil) // No longer need callback in router
 	m.preConsignmentRouter = router.NewPreConsignmentRouter(preConsignmentService)
+	m.chaRouter = router.NewCHARouter(chaService)
 
 	// Start listening for workflow node updates
 	m.StartWorkflowNodeUpdateListener()
@@ -239,6 +244,11 @@ func (m *Manager) HandleGetPreConsignmentsByTraderID(w http.ResponseWriter, r *h
 // HandleGetPreConsignmentByID handles GET /api/v1/pre-consignments/{preConsignmentId}
 func (m *Manager) HandleGetPreConsignmentByID(w http.ResponseWriter, r *http.Request) {
 	m.preConsignmentRouter.HandleGetPreConsignmentByID(w, r)
+}
+
+// HandleGetCHAs handles GET /api/v1/chas
+func (m *Manager) HandleGetCHAs(w http.ResponseWriter, r *http.Request) {
+	m.chaRouter.HandleGetCHAs(w, r)
 }
 
 // pluginStateToWorkflowNodeState converts a plugin.State to a WorkflowNodeState.

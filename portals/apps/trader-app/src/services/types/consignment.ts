@@ -1,7 +1,14 @@
+export interface CHA {
+  id: string
+  name: string
+  description: string
+  email?: string
+}
+
 export type TradeFlow = 'IMPORT' | 'EXPORT'
 
 export type ConsignmentState =
-  | 'AWAITING_INITIATION'
+  | 'INITIALIZED'
   | 'IN_PROGRESS'
   | 'REQUIRES_REWORK'
   | 'FINISHED'

@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, type ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Badge, Box, Button, Dialog, Flex, IconButton, Select, Spinner, Text, TextField } from '@radix-ui/themes'
 import { MagnifyingGlassIcon, PlusIcon } from '@radix-ui/react-icons'
-import type { ConsignmentSummary, TradeFlow, ConsignmentState } from "../services/types/consignment.ts"
-import { createConsignment, getAllConsignments } from "../services/consignment.ts"
+import type { ConsignmentSummary, TradeFlow, ConsignmentState, CHA } from "../services/types/consignment.ts"
+import { createConsignment, getAllConsignments, getCHAs } from "../services/consignment.ts"
 import { useApi } from '../services/ApiContext'
 import { getStateColor, formatState, formatDate } from '../utils/consignmentUtils'
 import { PaginationControl } from '../components/common/PaginationControl'
@@ -13,18 +13,11 @@ import { CHASearch, type CHAOption } from '../components/CHAPicker/CHASearch'
 // Local alias (avoid a second themes import just for Text-as)
 const RadixText = Text
 
-const CHA_OPTIONS = [
-  { id: 'a1b2c3d4-0001-4000-8000-000000000001', name: 'Spectra' },
-  { id: 'a1b2c3d4-0002-4000-8000-000000000002', name: 'Aitken Spence' },
-  { id: 'a1b2c3d4-0003-4000-8000-000000000003', name: 'Advantis' },
-  { id: 'a1b2c3d4-0004-4000-8000-000000000004', name: 'Yusen' },
-  { id: 'a1b2c3d4-0005-4000-8000-000000000005', name: 'Malship' },
-] as const satisfies readonly CHAOption[]
-
 export function ConsignmentScreen() {
   const navigate = useNavigate()
   const api = useApi()
   const [consignments, setConsignments] = useState<ConsignmentSummary[]>([])
+  const [chaOptions, setChaOptions] = useState<CHAOption[]>([])
 
   const [totalCount, setTotalCount] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -39,10 +32,7 @@ export function ConsignmentScreen() {
   // Temporary role toggle (until roles come from IDP)
   const [roleView, setRoleView] = useState<'trader' | 'cha'>('trader')
   const [chaId, setChaId] = useState<string>(() => {
-    return (
-      window.localStorage.getItem('consignments.chaId') ||
-      CHA_OPTIONS[2].id // default: Advantis
-    )
+    return window.localStorage.getItem('consignments.chaId') || ''
   })
 
   // New consignment state
@@ -51,7 +41,26 @@ export function ConsignmentScreen() {
   const listRequestIdRef = useRef(0)
   const [newStep, setNewStep] = useState<'trade-flow' | 'cha'>('trade-flow')
   const [newFlow, setNewFlow] = useState<TradeFlow | null>(null)
-  const [newChaId, setNewChaId] = useState<string>(CHA_OPTIONS[2].id)
+  const [newChaId, setNewChaId] = useState<string>('')
+
+  useEffect(() => {
+    async function fetchCHAs() {
+      try {
+        const data = await getCHAs(api)
+        const options: CHAOption[] = data.map((c: CHA) => ({ id: c.id, name: c.name }))
+        setChaOptions(options)
+        if (!chaId && options.length > 0) {
+          setChaId(options[0].id)
+        }
+        if (!newChaId && options.length > 0) {
+          setNewChaId(options[0].id)
+        }
+      } catch (error) {
+        console.error('Failed to fetch CHAs:', error)
+      }
+    }
+    fetchCHAs()
+  }, [api])
 
   useEffect(() => {
     async function fetchConsignments() {
@@ -90,7 +99,7 @@ export function ConsignmentScreen() {
   const resetNewConsignment = () => {
     setNewStep('trade-flow')
     setNewFlow(null)
-    setNewChaId(CHA_OPTIONS[2].id)
+    setNewChaId(chaOptions.length > 0 ? chaOptions[0].id : '')
   }
 
   const handleNewOpenChange = (open: boolean) => {
@@ -258,8 +267,8 @@ export function ConsignmentScreen() {
                   Select CHA
                 </RadixText>
                 <CHASearch
-                  options={CHA_OPTIONS}
-                  value={CHA_OPTIONS.find((c) => c.id === newChaId) ?? null}
+                  options={chaOptions}
+                  value={chaOptions.find((c) => c.id === newChaId) ?? null}
                   onChange={(cha) => {
                     if (cha) setNewChaId(cha.id)
                   }}
@@ -333,7 +342,7 @@ export function ConsignmentScreen() {
                 >
                   <Select.Trigger placeholder="CHA" />
                   <Select.Content>
-                    {CHA_OPTIONS.map((c) => (
+                    {chaOptions.map((c) => (
                       <Select.Item key={c.id} value={c.id}>
                         {c.name}
                       </Select.Item>

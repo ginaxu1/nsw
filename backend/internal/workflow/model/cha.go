@@ -5,6 +5,7 @@ type CHA struct {
 	BaseModel
 	Name        string `gorm:"type:varchar(255);column:name;not null" json:"name"`
 	Description string `gorm:"type:text;column:description" json:"description"`
+	Email       string `gorm:"type:varchar(255);column:email" json:"email,omitempty"`
 }
 
 func (c *CHA) TableName() string {

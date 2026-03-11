@@ -14,9 +14,9 @@ const (
 type ConsignmentState string
 
 const (
-	ConsignmentStateAwaitingInitiation ConsignmentState = "AWAITING_INITIATION"
-	ConsignmentStateInProgress         ConsignmentState = "IN_PROGRESS"
-	ConsignmentStateFinished           ConsignmentState = "FINISHED"
+	ConsignmentStateInitialized ConsignmentState = "INITIALIZED"
+	ConsignmentStateInProgress  ConsignmentState = "IN_PROGRESS"
+	ConsignmentStateFinished    ConsignmentState = "FINISHED"
 )
 
 // Consignment represents a consignment in the system.
@@ -59,9 +59,9 @@ type HSCodeResponseDTO struct {
 	Category    string    `json:"category"`    // Category of the HS Code
 }
 
-// InitializeConsignmentDTO is the request body for PUT /consignments/{id}/initialize (Stage 2 – CHA selects HS Code).
+// InitializeConsignmentDTO is the request body for PUT /consignments/{id}/initialize (Stage 2 – CHA selects HS Code(s)).
 type InitializeConsignmentDTO struct {
-	HSCodeID uuid.UUID `json:"hsCodeId" binding:"required"` // HS Code ID to start the workflow
+	HSCodeIDs []uuid.UUID `json:"hsCodeIds" binding:"required,min=1"`
 }
 
 // CreateConsignmentItemDTO represents the data required to create a consignment item.
@@ -70,7 +70,7 @@ type CreateConsignmentItemDTO struct {
 }
 
 // CreateConsignmentDTO represents the data required to create a consignment.
-// Stage 1 (two-stage flow): provide flow + chaId only → creates shell with state AWAITING_INITIATION.
+// Stage 1 (two-stage flow): provide flow + chaId only → creates shell with state INITIALIZED.
 // Legacy / single-stage: provide flow + items → creates consignment and initializes workflow.
 type CreateConsignmentDTO struct {
 	Flow  ConsignmentFlow            `json:"flow" binding:"required,oneof=IMPORT EXPORT"` // e.g., IMPORT, EXPORT

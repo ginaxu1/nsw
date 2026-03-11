@@ -111,13 +111,13 @@ export function ConsignmentDetailScreen() {
   const progressPercentage = totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0
   const searchParams = new URLSearchParams(location.search)
   const isChaView = searchParams.get('view') === 'cha'
-  const canSelectHsCode = isChaView && consignment.state === 'AWAITING_INITIATION'
+  const canSelectHsCode = isChaView && consignment.state === 'INITIALIZED'
 
   const handleSelectHSCode = async (hsCode: HSCode) => {
     if (!consignmentId) return
     setInitializing(true)
     try {
-      await initializeConsignment(consignmentId, hsCode.id, api)
+      await initializeConsignment(consignmentId, [hsCode.id], api)
       setHsPickerOpen(false)
       await fetchConsignment()
     } catch (e) {

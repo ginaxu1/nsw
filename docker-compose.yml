@@ -164,6 +164,7 @@ services:
           001_insert_seed_workflow_node_templates.sql \
           001_insert_seed_workflow_templates.sql \
           001_insert_seed_workflow_hscode_map.sql \
+          001_insert_cha_entity.sql \
           001_insert_seed_pre_consignment_template.sql; do
           if [ -f "$$FILE" ]; then
             echo "Executing: $$FILE"

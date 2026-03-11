@@ -7,7 +7,7 @@ export function getStateColor(
   state: ConsignmentState
 ): 'gray' | 'orange' | 'green' | 'red' {
   switch (state) {
-    case 'AWAITING_INITIATION':
+    case 'INITIALIZED':
     case 'IN_PROGRESS':
       return 'orange'
     case 'FINISHED':
@@ -25,9 +25,6 @@ export function getStateColor(
  * Example: IN_PROGRESS -> In Progress
  */
 export function formatState(state: ConsignmentState): string {
-  if (state === 'AWAITING_INITIATION') {
-    return 'IN PROGRESS'
-  }
   return state.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 

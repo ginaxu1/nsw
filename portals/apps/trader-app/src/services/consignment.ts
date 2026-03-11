@@ -5,6 +5,7 @@ import type {
   CreateConsignmentResponse,
   ConsignmentState,
   TradeFlow,
+  CHA,
 } from './types/consignment'
 import { defaultApiClient, type ApiClient } from './api'
 
@@ -20,12 +21,12 @@ export async function createConsignment(
 
 export async function initializeConsignment(
   consignmentId: string,
-  hsCodeId: string,
+  hsCodeIds: string[],
   apiClient: ApiClient = defaultApiClient
 ): Promise<CreateConsignmentResponse> {
-  return apiClient.put<{ hsCodeId: string }, CreateConsignmentResponse>(
-    `/consignments/${consignmentId}/initialize`,
-    { hsCodeId }
+  return apiClient.put<{ hsCodeIds: string[] }, CreateConsignmentResponse>(
+    `/consignments/${consignmentId}`,
+    { hsCodeIds }
   )
 }
 
@@ -42,6 +43,12 @@ export async function getConsignment(
     }
     throw error
   }
+}
+
+export async function getCHAs(
+  apiClient: ApiClient = defaultApiClient
+): Promise<CHA[]> {
+  return apiClient.get<CHA[]>('/chas')
 }
 
 export async function getAllConsignments(

@@ -24,7 +24,7 @@ func NewConsignmentRouter(cs *service.ConsignmentService, _ interface{}) *Consig
 }
 
 // HandleCreateConsignment handles POST /api/v1/consignments
-// Stage 1 (two-stage): body { flow, chaId } → creates shell (AWAITING_INITIATION)
+// Stage 1 (two-stage): body { flow, chaId } → creates shell (INITIALIZED)
 // Legacy: body { flow, items } → creates and initializes workflow
 func (c *ConsignmentRouter) HandleCreateConsignment(w http.ResponseWriter, r *http.Request) {
 	authCtx := auth.GetAuthContext(r.Context())
@@ -69,7 +69,10 @@ func (c *ConsignmentRouter) HandleCreateConsignment(w http.ResponseWriter, r *ht
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(consignment)
+	if err := json.NewEncoder(w).Encode(consignment); err != nil {
+		http.Error(w, "failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
 
 // HandleGetConsignments handles GET /api/v1/consignments
@@ -135,11 +138,14 @@ func (c *ConsignmentRouter) HandleGetConsignments(w http.ResponseWriter, r *http
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(consignments)
+	if err := json.NewEncoder(w).Encode(consignments); err != nil {
+		http.Error(w, "failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
 
-// HandleInitializeConsignment handles PUT /api/v1/consignments/{id}/initialize (Stage 2: CHA selects HS Code).
-// Body: InitializeConsignmentDTO { hsCodeId }. Response: ConsignmentDetailDTO.
+// HandleInitializeConsignment handles PUT /api/v1/consignments/{id}/initialize (Stage 2: CHA selects HS Codes).
+// Body: InitializeConsignmentDTO { hsCodeIds: []uuid }. Response: ConsignmentDetailDTO.
 func (c *ConsignmentRouter) HandleInitializeConsignment(w http.ResponseWriter, r *http.Request) {
 	authCtx := auth.GetAuthContext(r.Context())
 	if authCtx == nil {
@@ -164,7 +170,12 @@ func (c *ConsignmentRouter) HandleInitializeConsignment(w http.ResponseWriter, r
 		return
 	}
 
-	consignment, _, err := c.cs.InitializeConsignmentByID(r.Context(), consignmentID, req.HSCodeID)
+	if len(req.HSCodeIDs) == 0 {
+		http.Error(w, "hsCodeIds must contain at least one ID", http.StatusBadRequest)
+		return
+	}
+
+	consignment, _, err := c.cs.InitializeConsignmentByID(r.Context(), consignmentID, req.HSCodeIDs)
 	if err != nil {
 		http.Error(w, "failed to initialize consignment: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -172,7 +183,10 @@ func (c *ConsignmentRouter) HandleInitializeConsignment(w http.ResponseWriter, r
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(consignment)
+	if err := json.NewEncoder(w).Encode(consignment); err != nil {
+		http.Error(w, "failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
 
 // HandleGetConsignmentByID handles GET /api/v1/consignments/{id}
