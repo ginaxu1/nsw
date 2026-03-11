@@ -6,11 +6,12 @@ import (
 )
 
 type Config struct {
-	Port           string
-	DBPath         string
-	FormsPath      string
-	DefaultFormID  string
-	AllowedOrigins []string
+	Port              string
+	DBPath            string
+	FormsPath         string
+	DefaultFormID     string
+	AllowedOrigins    []string
+	BackendAPIBaseURL string
 }
 
 func LoadConfig() Config {
@@ -21,7 +22,8 @@ func LoadConfig() Config {
 		// If Meta is not set in the request from NSW, the default form will be used
 		DefaultFormID: envOrDefault("OGA_DEFAULT_FORM_ID", "default"),
 		// TODO: when productionization, need to remove the '*' (Allowing All Origins)
-		AllowedOrigins: parseOrigins(envOrDefault("OGA_ALLOWED_ORIGINS", "*")),
+		AllowedOrigins:    parseOrigins(envOrDefault("OGA_ALLOWED_ORIGINS", "*")),
+		BackendAPIBaseURL: envOrDefault("BACKEND_API_BASE_URL", "http://localhost:8080/api/v1"),
 	}
 }
 
