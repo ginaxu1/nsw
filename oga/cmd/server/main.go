@@ -44,7 +44,7 @@ func main() {
 	}()
 
 	// Initialize handlers
-	handler := internal.NewOGAHandler(service)
+	handler := internal.NewOGAHandler(service, cfg.BackendAPIBaseURL)
 	feedbackHandler := feedback.NewHandler(service)
 
 	// Set up HTTP routes
@@ -58,6 +58,7 @@ func main() {
 	mux.HandleFunc("GET /api/oga/applications/{taskId}", handler.HandleGetApplication)
 	mux.HandleFunc("POST /api/oga/applications/{taskId}/review", handler.HandleReviewApplication)
 	mux.HandleFunc("POST /api/oga/applications/{taskId}/feedback", feedbackHandler.HandleFeedback)
+	mux.HandleFunc("GET /api/oga/uploads/{key}", handler.HandleGetUploadURL)
 
 	// Set up graceful shutdown
 	serverAddr := fmt.Sprintf(":%s", cfg.Port)

@@ -3,22 +3,26 @@ package internal
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 )
 
 // OGAHandler handles HTTP requests for OGA portal operations
 type OGAHandler struct {
-	service OGAService
+	service           OGAService
+	backendAPIBaseURL string
 }
 
 // NewOGAHandler creates a new OGA handler instance
-func NewOGAHandler(service OGAService) *OGAHandler {
+func NewOGAHandler(service OGAService, backendAPIBaseURL string) *OGAHandler {
 	return &OGAHandler{
-		service: service,
+		service:           service,
+		backendAPIBaseURL: backendAPIBaseURL,
 	}
 }
 
@@ -186,5 +190,31 @@ func (h *OGAHandler) HandleReviewApplication(w http.ResponseWriter, r *http.Requ
 	WriteJSONResponse(w, http.StatusOK, map[string]any{
 		"success": true,
 		"message": "Application reviewed successfully",
+	})
+}
+
+// HandleGetUploadURL returns a download URL for a file stored in the main
+// backend's upload service. OGA users are authenticated against a different
+// identity provider, so their tokens are not valid for the main backend.
+// Instead of proxying the authenticated metadata call, we construct the
+// public content URL directly (the backend's /content endpoint serves files
+// without auth, analogous to an S3 presigned URL).
+//
+// TODO: This relies on the backend's LocalFSDriver /content endpoint which
+// has no auth. In production with S3, this endpoint should instead proxy
+// the GET /uploads/{key} call to the main backend using service-to-service
+// authentication (e.g. shared secret or internal API key) to obtain a
+// presigned download URL.
+func (h *OGAHandler) HandleGetUploadURL(w http.ResponseWriter, r *http.Request) {
+	key := r.PathValue("key")
+	if key == "" {
+		WriteJSONError(w, http.StatusBadRequest, "key is required")
+		return
+	}
+
+	downloadURL := fmt.Sprintf("%s/uploads/%s/content", h.backendAPIBaseURL, key)
+	WriteJSONResponse(w, http.StatusOK, map[string]any{
+		"download_url": downloadURL,
+		"expires_at":   time.Now().Add(15 * time.Minute).Unix(),
 	})
 }
