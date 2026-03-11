@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strconv"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+var storageKeyRx = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}(\.[a-zA-Z0-9]+)?$`)
 
 // OGAHandler handles HTTP requests for OGA portal operations
 type OGAHandler struct {
@@ -81,14 +84,14 @@ func (h *OGAHandler) HandleGetApplications(w http.ResponseWriter, r *http.Reques
 	ctx := r.Context()
 	status := r.URL.Query().Get("status")
 	page, err := strconv.Atoi(r.URL.Query().Get("page"))
-
 	if err != nil {
 		WriteJSONError(w, http.StatusBadRequest, "Invalid page number")
+		return
 	}
 	pageSize, err := strconv.Atoi(r.URL.Query().Get("pageSize"))
-
 	if err != nil {
 		WriteJSONError(w, http.StatusBadRequest, "Invalid page size")
+		return
 	}
 
 	result, err := h.service.GetApplications(ctx, status, page, pageSize)
@@ -203,6 +206,10 @@ func (h *OGAHandler) HandleGetUploadURL(w http.ResponseWriter, r *http.Request) 
 	key := r.PathValue("key")
 	if key == "" {
 		WriteJSONError(w, http.StatusBadRequest, "key is required")
+		return
+	}
+	if !storageKeyRx.MatchString(key) {
+		WriteJSONError(w, http.StatusBadRequest, "invalid key format")
 		return
 	}
 

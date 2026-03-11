@@ -76,30 +76,20 @@
                 "scope": "#/properties/registrationNumber"
             },
             {
-                "type": "HorizontalLayout",
-                "elements": [
-                    {
-                        "type": "Control",
-                        "scope": "#/properties/tinNumber"
-                    },
-                    {
-                        "type": "Control",
-                        "scope": "#/properties/tinCertificate"
-                    }
-                ]
+                "type": "Control",
+                "scope": "#/properties/tinNumber"
             },
             {
-                "type": "HorizontalLayout",
-                "elements": [
-                    {
-                        "type": "Control",
-                        "scope": "#/properties/vatNumber"
-                    },
-                    {
-                        "type": "Control",
-                        "scope": "#/properties/vatCertificate"
-                    }
-                ]
+                "type": "Control",
+                "scope": "#/properties/tinCertificate"
+            },
+            {
+                "type": "Control",
+                "scope": "#/properties/vatNumber"
+            },
+            {
+                "type": "Control",
+                "scope": "#/properties/vatCertificate"
             }
         ]
     }
