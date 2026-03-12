@@ -79,7 +79,8 @@ func (c *ConsignmentRouter) HandleCreateConsignment(w http.ResponseWriter, r *ht
 // When role=cha the CHA is resolved from the authenticated user's email.
 // Pagination: offset, limit. Optional filters: state, flow.
 func (c *ConsignmentRouter) HandleGetConsignments(w http.ResponseWriter, r *http.Request) {
-	authCtx := auth.GetAuthContext(r.Context())
+	ctx := r.Context()
+	authCtx := auth.GetAuthContext(ctx)
 	if authCtx == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -91,20 +92,17 @@ func (c *ConsignmentRouter) HandleGetConsignments(w http.ResponseWriter, r *http
 	if role == "" {
 		role = "trader"
 	}
-	if role != "trader" && role != "cha" {
-		http.Error(w, "query param role must be trader or cha", http.StatusBadRequest)
-		return
-	}
-
 	offset, limit, err := utils.ParsePaginationParams(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	filter := model.ConsignmentFilter{
+		Offset: offset,
+		Limit:  limit,
+	}
 
-	var filter model.ConsignmentFilter
-	filter.Offset = offset
-	filter.Limit = limit
+	// Optional Filters
 	if stateStr := r.URL.Query().Get("state"); stateStr != "" {
 		state := model.ConsignmentState(stateStr)
 		filter.State = &state
@@ -114,12 +112,10 @@ func (c *ConsignmentRouter) HandleGetConsignments(w http.ResponseWriter, r *http
 		filter.Flow = &flow
 	}
 
-	userID := authCtx.UserID
-
-	if role != "cha" {
-		filter.TraderID = &userID
-	} else {
-		// Handle CHA role: URL param takes priority
+	// Role-Based Identity Resolution
+	switch role {
+	case "cha":
+		// Check if UI sent a specific ID to filter by
 		if chaIDStr := r.URL.Query().Get("cha_id"); chaIDStr != "" {
 			chaID, err := uuid.Parse(chaIDStr)
 			if err != nil {
@@ -128,27 +124,28 @@ func (c *ConsignmentRouter) HandleGetConsignments(w http.ResponseWriter, r *http
 			}
 			filter.ChaID = &chaID
 		} else {
-			// Fallback: Resolve the specific CHA Entity from the DB
-			cha, err := c.cha.GetCHAByEmail(r.Context(), userID)
+			// Fallback: Default to the user's own profile if no specific ID requested
+			cha, err := c.cha.GetCHAByEmail(ctx, authCtx.UserID)
 			if err != nil {
-				http.Error(w, "failed to resolve CHA", http.StatusForbidden)
+				http.Error(w, "failed to resolve default CHA profile", http.StatusForbidden)
 				return
 			}
 			filter.ChaID = &cha.ID
 		}
-	}
-
-	consignments, err := c.cs.ListConsignments(r.Context(), filter)
-	if err != nil {
-		http.Error(w, "failed to retrieve consignments: "+err.Error(), http.StatusInternalServerError)
+	case "trader":
+		filter.TraderID = &authCtx.UserID
+	default:
+		http.Error(w, "query param role must be trader or cha", http.StatusBadRequest)
 		return
 	}
-
+	consignments, err := c.cs.ListConsignments(ctx, filter)
+	if err != nil {
+		http.Error(w, "failed to retrieve consignments", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(consignments); err != nil {
 		http.Error(w, "failed to encode response", http.StatusInternalServerError)
-		return
 	}
 }
 
