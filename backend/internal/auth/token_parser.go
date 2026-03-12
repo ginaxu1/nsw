@@ -17,11 +17,13 @@ import (
 type tokenClaims struct {
 	jwt.RegisteredClaims
 	ClientID string `json:"client_id"`
+	Email    string `json:"email"`
 	OUHandle string `json:"ouHandle"`
 }
 
 type ExtractedClaims struct {
 	UserID   string `json:"userId"`
+	Email    string `json:"email"`
 	OUHandle string `json:"ouHandle"`
 }
 
@@ -163,6 +165,7 @@ func (te *TokenExtractor) ExtractClaimsFromHeader(authHeader string) (*Extracted
 
 	return &ExtractedClaims{
 		UserID:   userID,
+		Email:    strings.TrimSpace(claims.Email),
 		OUHandle: strings.TrimSpace(claims.OUHandle),
 	}, nil
 }

@@ -21,6 +21,7 @@ func (t *UserContext) TableName() string {
 // UserContext is nullable — CHAs and other non-trader roles may not have a DB entry.
 type AuthContext struct {
 	UserID      string       `json:"userId"`
+	Email       string       `json:"email"`
 	OUHandle    string       `json:"ouHandle"`
 	UserContext *UserContext `json:"userContext,omitempty"`
 }

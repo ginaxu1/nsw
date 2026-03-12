@@ -62,6 +62,7 @@ func Middleware(authService *AuthService, tokenExtractor *TokenExtractor) func(h
 
 			authCtx := &AuthContext{
 				UserID:   claims.UserID,
+				Email:    claims.Email,
 				OUHandle: claims.OUHandle,
 			}
 
