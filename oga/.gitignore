@@ -19,10 +19,8 @@ vendor/
 .env.local
 
 # Local data directories
-data/*
-!data/forms/
-data/forms/*
-!data/forms/*.json
+data/
+!data/forms/default.json
 
 # OS-specific files
 .DS_Store
