@@ -36,8 +36,7 @@ func (r *PreConsignmentRouter) HandleGetTraderPreConsignments(w http.ResponseWri
 		return
 	}
 
-	// Use traderId from auth context
-	traderID := authCtx.TraderID
+	traderID := authCtx.UserID
 
 	offset, limit, err := utils.ParsePaginationParams(req)
 	if err != nil {
@@ -74,11 +73,8 @@ func (r *PreConsignmentRouter) HandleCreatePreConsignment(w http.ResponseWriter,
 		return
 	}
 
-	// Extract traderId from auth context
-	traderId := authCtx.TraderID
-
-	// Extract traderContext from auth
-	traderContext, err := authCtx.GetTraderContextMap()
+	traderId := authCtx.UserID
+	traderContext, err := authCtx.GetUserContextMap()
 	if err != nil {
 		http.Error(w, "failed to parse trader context", http.StatusInternalServerError)
 		return
@@ -108,8 +104,7 @@ func (r *PreConsignmentRouter) HandleGetPreConsignmentsByTraderID(w http.Respons
 		return
 	}
 
-	// Use traderId from auth context
-	traderID := authCtx.TraderID
+	traderID := authCtx.UserID
 
 	preConsignments, err := r.pcs.GetPreConsignmentsByTraderID(req.Context(), traderID)
 	if err != nil {

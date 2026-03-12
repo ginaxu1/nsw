@@ -208,11 +208,12 @@ func TestManager_HandleGetPreConsignmentByID(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
 
-func withAuthContext(ctx context.Context, traderID string) context.Context {
+func withAuthContext(ctx context.Context, userID string) context.Context {
 	authCtx := &auth.AuthContext{
-		TraderContext: &auth.TraderContext{
-			TraderID:      traderID,
-			TraderContext: json.RawMessage(`{}`),
+		UserID: userID,
+		UserContext: &auth.UserContext{
+			UserID:      userID,
+			UserContext: json.RawMessage(`{}`),
 		},
 	}
 	return context.WithValue(ctx, auth.AuthContextKey, authCtx)

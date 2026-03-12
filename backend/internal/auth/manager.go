@@ -42,7 +42,6 @@ type Manager struct {
 func NewManager(db *gorm.DB, authConfig config.AuthConfig) (*Manager, error) {
 	slog.Info("initializing auth manager")
 
-	// Initialize auth service
 	service := NewAuthService(db)
 	httpClient := &http.Client{Timeout: 10 * time.Second}
 	if authConfig.InsecureSkipTLSVerify {
@@ -51,29 +50,18 @@ func NewManager(db *gorm.DB, authConfig config.AuthConfig) (*Manager, error) {
 		}
 	}
 
-	// Initialize token extractor
 	tokenExtractor, err := NewTokenExtractorWithClient(
-		authConfig.JWKSURL,
-		authConfig.Issuer,
-		authConfig.Audience,
-		authConfig.ClientID,
-		httpClient,
+		authConfig.JWKSURL, authConfig.Issuer, authConfig.Audience, authConfig.ClientID, httpClient,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize token extractor: %w", err)
 	}
 
-	// Create middleware
-	middleware := Middleware(service, tokenExtractor)
-
-	m := &Manager{
+	return &Manager{
 		service:        service,
 		tokenExtractor: tokenExtractor,
-		middleware:     middleware,
-	}
-
-	slog.Debug("auth manager initialized successfully")
-	return m, nil
+		middleware:     Middleware(service, tokenExtractor),
+	}, nil
 }
 
 // Middleware returns the auth middleware function.
@@ -90,9 +78,7 @@ func NewManager(db *gorm.DB, authConfig config.AuthConfig) (*Manager, error) {
 // 4. Injects context into request
 //
 // Gracefully degrades if auth is missing or fails.
-func (m *Manager) Middleware() func(http.Handler) http.Handler {
-	return m.middleware
-}
+func (m *Manager) Middleware() func(http.Handler) http.Handler { return m.middleware }
 
 // Service returns the auth service for direct use if needed.
 // Most applications won't need this - use the middleware instead.
@@ -105,9 +91,7 @@ func (m *Manager) Middleware() func(http.Handler) http.Handler {
 //
 //	authService := authManager.Service()
 //	context, err := authService.GetTraderContext("TRADER-001")
-func (m *Manager) Service() *AuthService {
-	return m.service
-}
+func (m *Manager) Service() *AuthService { return m.service }
 
 // RequireAuthMiddleware returns a middleware that requires authentication.
 // If no auth context is found, returns 401 Unauthorized.
@@ -135,38 +119,35 @@ func (m *Manager) RequireAuthMiddleware() func(http.Handler) http.Handler {
 //	)
 //
 // The handler can check if auth context is available and personalize response.
-func (m *Manager) OptionalAuthMiddleware() func(http.Handler) http.Handler {
-	return m.middleware
-}
+func (m *Manager) OptionalAuthMiddleware() func(http.Handler) http.Handler { return m.middleware }
 
-// GetTraderContext is a convenience method to look up trader context directly.
+// GetUserContext is a convenience method to look up trader or CHA context directly.
 // Useful for non-request operations (e.g., background jobs, admin commands).
 //
 // Example:
 //
 //	authManager := auth.NewManager(db)
-//	ctx, err := authManager.GetTraderContext("TRADER-001")
+//	ctx, err := authManager.GetUserContext("TRADER-001")
 //
 // For request-based operations, use auth.GetAuthContext(r.Context()) in handlers instead.
-func (m *Manager) GetTraderContext(traderID string) (*TraderContext, error) {
-	return m.service.GetTraderContext(traderID)
+func (m *Manager) GetUserContext(userID string) (*UserContext, error) {
+	return m.service.GetUserContext(userID)
 }
 
-// UpdateTraderContext is a convenience method to update trader context directly.
+// UpdateUserContext is a convenience method to update trader or CHA context directly.
 // Useful for admin operations or background jobs.
 //
 // Example:
 //
 //	authManager := auth.NewManager(db)
 //	newContext := json.RawMessage(`{"status": "verified"}`)
-//	err := authManager.UpdateTraderContext("TRADER-001", newContext)
+//	err := authManager.UpdateUserContext("TRADER-001", newContext)
 //
 // For request-based operations, use a handler with auth context instead.
-func (m *Manager) UpdateTraderContext(traderID string, context interface{}) error {
-	// Handle both json.RawMessage and other types
+func (m *Manager) UpdateUserContext(userID string, ctx interface{}) error {
 	var data []byte
 	var err error
-	switch v := context.(type) {
+	switch v := ctx.(type) {
 	case []byte:
 		data = v
 	default:
@@ -175,7 +156,7 @@ func (m *Manager) UpdateTraderContext(traderID string, context interface{}) erro
 			return fmt.Errorf("failed to marshal context: %w", err)
 		}
 	}
-	return m.service.UpdateTraderContext(traderID, data)
+	return m.service.UpdateUserContext(userID, data)
 }
 
 // Health checks if the auth system is functioning properly.
@@ -193,17 +174,11 @@ func (m *Manager) UpdateTraderContext(traderID string, context interface{}) erro
 //
 // Returns an error if anything is wrong, allowing graceful failure at startup.
 func (m *Manager) Health() error {
-	// Try to query trader_contexts table (even if empty)
 	var count int64
-	result := m.service.db.Model(&TraderContext{}).Count(&count)
-	if result.Error != nil {
-		slog.Error("auth health check failed",
-			"error", result.Error,
-		)
-		return result.Error
+	if err := m.service.db.Model(&UserContext{}).Count(&count).Error; err != nil {
+		return err
 	}
-
-	slog.Info("auth health check passed", "traders_count", count)
+	slog.Info("auth health check passed", "user_context_count", count)
 	return nil
 }
 

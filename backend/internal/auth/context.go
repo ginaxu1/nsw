@@ -1,60 +1,62 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 )
 
-// TraderContext represents the context of a trader in the database.
-// This model persists trader information and associated metadata.
-type TraderContext struct {
-	TraderID      string          `gorm:"type:varchar(100);column:trader_id;primaryKey;not null" json:"trader_id"`
-	TraderContext json.RawMessage `gorm:"type:jsonb;column:trader_context;serializer:json;not null" json:"trader_context"`
+// UserContext represents a user's stored context in the database.
+// Maps to the trader_contexts table (kept for backward compatibility).
+type UserContext struct {
+	UserID      string          `gorm:"type:varchar(100);column:trader_id;primaryKey;not null" json:"trader_id"`
+	UserContext json.RawMessage `gorm:"type:jsonb;column:trader_context;serializer:json;not null" json:"trader_context"`
 }
 
-// TableName specifies the database table name for TraderContext
-func (t *TraderContext) TableName() string {
+func (t *UserContext) TableName() string {
 	return "trader_contexts"
 }
 
-// AuthContext represents the authentication context available in a request.
-// This is a transient context that is injected into the request by the auth middleware.
-// It contains trader information retrieved from the database based on the token.
-// Also includes OUHandle from the token claims for potential authorization decisions.
-//
-// Future: We can extend this struct to include more fields from the token or database as needed.
+// AuthContext is the transient authentication context injected into each request
+// by the auth middleware. UserID is always set (from the JWT sub claim).
+// UserContext is nullable — CHAs and other non-trader roles may not have a DB entry.
 type AuthContext struct {
-	*TraderContext
-	OUHandle string `json:"ouHandle"`
+	UserID      string       `json:"userId"`
+	OUHandle    string       `json:"ouHandle"`
+	UserContext *UserContext `json:"userContext,omitempty"`
 }
 
-// GetTraderID is a convenience method to get the trader ID directly from AuthContext.
-// Returns empty string if AuthContext is nil.
-func (a *AuthContext) GetTraderID() string {
-	if a == nil || a.TraderContext == nil {
-		return ""
+// GetUserContextMap returns the stored user context as a map.
+// Returns an empty map when no context is available.
+func (ac *AuthContext) GetUserContextMap() (map[string]any, error) {
+	m := make(map[string]any)
+	if ac == nil || ac.UserContext == nil || len(ac.UserContext.UserContext) == 0 {
+		return m, nil
 	}
-	return a.TraderID
-}
-
-// GetTraderContextMap returns the trader context as a map for convenient access.
-// If no context exists, it returns an empty map.
-func (ac *AuthContext) GetTraderContextMap() (map[string]any, error) {
-	contextMap := make(map[string]any)
-	if ac == nil || ac.TraderContext == nil || len(ac.TraderContext.TraderContext) == 0 {
-		return contextMap, nil
-	}
-	err := json.Unmarshal(ac.TraderContext.TraderContext, &contextMap)
-	if err != nil {
+	if err := json.Unmarshal(ac.UserContext.UserContext, &m); err != nil {
 		return nil, err
 	}
-	return contextMap, nil
+	return m, nil
 }
 
-// GetOUHandle is a convenience method to get the OUHandle directly from AuthContext.
-// Returns empty string if AuthContext is nil or OUHandle is not set.
-func (a *AuthContext) GetOUHandle() string {
-	if a == nil {
-		return ""
+// ContextKey is a custom type for context keys to avoid collisions.
+type ContextKey string
+
+const AuthContextKey ContextKey = "authContext"
+
+// GetAuthContext extracts the AuthContext from a request context.
+// Returns nil if no auth context is available (request had no valid token).
+//
+// Usage in handlers:
+//
+//	authCtx := auth.GetAuthContext(r.Context())
+//	if authCtx == nil {
+//	    // Handle unauthorized request
+//	}
+//	userID := authCtx.UserID
+func GetAuthContext(ctx context.Context) *AuthContext {
+	authCtx, ok := ctx.Value(AuthContextKey).(*AuthContext)
+	if !ok {
+		return nil
 	}
-	return a.OUHandle
+	return authCtx
 }

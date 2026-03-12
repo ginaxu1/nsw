@@ -66,7 +66,7 @@ func NewManager(tm taskManager.TaskManager, ch chan taskManager.WorkflowManagerN
 
 	// Initialize routers
 	m.hsCodeRouter = router.NewHSCodeRouter(hsCodeService)
-	m.consignmentRouter = router.NewConsignmentRouter(consignmentService, nil) // No longer need callback in router
+	m.consignmentRouter = router.NewConsignmentRouter(consignmentService, chaService)
 	m.preConsignmentRouter = router.NewPreConsignmentRouter(preConsignmentService)
 	m.chaRouter = router.NewCHARouter(chaService)
 

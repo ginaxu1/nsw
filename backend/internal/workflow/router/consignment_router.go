@@ -14,13 +14,12 @@ import (
 )
 
 type ConsignmentRouter struct {
-	cs *service.ConsignmentService
+	cs  *service.ConsignmentService
+	cha *service.CHAService
 }
 
-func NewConsignmentRouter(cs *service.ConsignmentService, _ interface{}) *ConsignmentRouter {
-	return &ConsignmentRouter{
-		cs: cs,
-	}
+func NewConsignmentRouter(cs *service.ConsignmentService, cha *service.CHAService) *ConsignmentRouter {
+	return &ConsignmentRouter{cs: cs, cha: cha}
 }
 
 // HandleCreateConsignment handles POST /api/v1/consignments
@@ -39,10 +38,10 @@ func (c *ConsignmentRouter) HandleCreateConsignment(w http.ResponseWriter, r *ht
 		return
 	}
 
-	traderID := authCtx.TraderID
-	globalContext, err := authCtx.GetTraderContextMap()
+	traderID := authCtx.UserID
+	globalContext, err := authCtx.GetUserContextMap()
 	if err != nil {
-		http.Error(w, "failed to parse trader context", http.StatusInternalServerError)
+		http.Error(w, "failed to parse user context", http.StatusInternalServerError)
 		return
 	}
 
@@ -76,9 +75,9 @@ func (c *ConsignmentRouter) HandleCreateConsignment(w http.ResponseWriter, r *ht
 }
 
 // HandleGetConsignments handles GET /api/v1/consignments
-// // Query params: role=trader | role=cha (defaults to trader). When role=cha, cha_id (UUID) is required
-// Pagination: offset, limit. Optional filters: state, flow
-// Response: ConsignmentListResult (containing ConsignmentSummaryDTO)
+// Query params: role=trader | role=cha (defaults to trader).
+// When role=cha the CHA is resolved from the authenticated user's email.
+// Pagination: offset, limit. Optional filters: state, flow.
 func (c *ConsignmentRouter) HandleGetConsignments(w http.ResponseWriter, r *http.Request) {
 	authCtx := auth.GetAuthContext(r.Context())
 	if authCtx == nil {
@@ -114,20 +113,24 @@ func (c *ConsignmentRouter) HandleGetConsignments(w http.ResponseWriter, r *http
 	}
 
 	if role == "cha" {
-		chaIDStr := r.URL.Query().Get("cha_id")
-		if chaIDStr == "" {
-			http.Error(w, "cha_id query param is required when role=cha", http.StatusBadRequest)
-			return
+		if chaIDStr := r.URL.Query().Get("cha_id"); chaIDStr != "" {
+			chaID, err := uuid.Parse(chaIDStr)
+			if err != nil {
+				http.Error(w, "invalid cha_id format", http.StatusBadRequest)
+				return
+			}
+			filter.ChaID = &chaID
+		} else {
+			cha, err := c.cha.GetCHAByEmail(r.Context(), authCtx.UserID)
+			if err != nil {
+				http.Error(w, "failed to resolve CHA for authenticated user: "+err.Error(), http.StatusForbidden)
+				return
+			}
+			filter.ChaID = &cha.ID
 		}
-		chaID, err := uuid.Parse(chaIDStr)
-		if err != nil {
-			http.Error(w, "invalid cha_id format", http.StatusBadRequest)
-			return
-		}
-		filter.ChaID = &chaID
 	} else {
-		traderID := authCtx.TraderID
-		filter.TraderID = &traderID
+		userID := authCtx.UserID
+		filter.TraderID = &userID
 	}
 
 	consignments, err := c.cs.ListConsignments(r.Context(), filter)

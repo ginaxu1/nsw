@@ -16,11 +16,11 @@ import (
 // TestGetAuthContextFromRequest tests context retrieval
 func TestGetAuthContext_FromRequest(t *testing.T) {
 	// Create a context with auth
-	tc := &TraderContext{
-		TraderID:      "TRADER-001",
-		TraderContext: json.RawMessage(`{"test": "data"}`),
+	uc := &UserContext{
+		UserID:      "TRADER-001",
+		UserContext: json.RawMessage(`{"test": "data"}`),
 	}
-	authCtx := &AuthContext{TraderContext: tc}
+	authCtx := &AuthContext{UserID: "TRADER-001", UserContext: uc}
 	ctx := context.WithValue(context.Background(), AuthContextKey, authCtx)
 
 	// Retrieve context
@@ -29,8 +29,8 @@ func TestGetAuthContext_FromRequest(t *testing.T) {
 		t.Error("expected to retrieve auth context")
 		return
 	}
-	if retrieved.TraderID != "TRADER-001" {
-		t.Errorf("got trader id %s, want TRADER-001", retrieved.TraderID)
+	if retrieved.UserID != "TRADER-001" {
+		t.Errorf("got trader id %s, want TRADER-001", retrieved.UserID)
 	}
 }
 
@@ -47,26 +47,26 @@ func TestGetAuthContext_NoContext(t *testing.T) {
 }
 
 // TestContextJSONUnmarshaling tests unmarshaling trader context JSON
-func TestTraderContext_JSONUnmarshaling(t *testing.T) {
+func TestUserContext_JSONUnmarshaling(t *testing.T) {
 	contextJSON := json.RawMessage(`{
 		"company": "Acme Inc",
 		"trading_type": "exporter",
 		"verified": true
 	}`)
 
-	tc := &TraderContext{
-		TraderID:      "TRADER-001",
-		TraderContext: contextJSON,
+	uc := &UserContext{
+		UserID:      "TRADER-001",
+		UserContext: contextJSON,
 	}
 
-	// Verify TraderID is set
-	if tc.TraderID != "TRADER-001" {
-		t.Errorf("got trader id %s, want TRADER-001", tc.TraderID)
+	// Verify UserID is set
+	if uc.UserID != "TRADER-001" {
+		t.Errorf("got trader id %s, want TRADER-001", uc.UserID)
 	}
 
 	// Unmarshal the JSON data
 	var data map[string]interface{}
-	err := json.Unmarshal(tc.TraderContext, &data)
+	err := json.Unmarshal(uc.UserContext, &data)
 	if err != nil {
 		t.Errorf("failed to unmarshal trader context: %v", err)
 	}

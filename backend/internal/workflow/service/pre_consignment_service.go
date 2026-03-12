@@ -415,57 +415,53 @@ func (s *PreConsignmentService) markPreConsignmentAsCompleted(ctx context.Contex
 // syncTraderContextToAuth synchronizes the pre-consignment trader context to the auth system.
 // This is called when a pre-consignment is completed to persist accumulated context.
 func (s *PreConsignmentService) syncTraderContextToAuth(ctx context.Context, tx *gorm.DB, preConsignment *model.PreConsignment) error {
-	var tc auth.TraderContext
+	var uc auth.UserContext
 	result := tx.WithContext(ctx).
 		Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("trader_id = ?", preConsignment.TraderID).
-		First(&tc)
+		First(&uc)
 
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			// Create new trader context if it doesn't exist
 			contextJSON, err := json.Marshal(preConsignment.TraderContext)
 			if err != nil {
-				return fmt.Errorf("failed to marshal trader context: %w", err)
+				return fmt.Errorf("failed to marshal user context: %w", err)
 			}
 
-			tc = auth.TraderContext{
-				TraderID:      preConsignment.TraderID,
-				TraderContext: contextJSON,
+			uc = auth.UserContext{
+				UserID:      preConsignment.TraderID,
+				UserContext: contextJSON,
 			}
 
-			if err := tx.WithContext(ctx).Create(&tc).Error; err != nil {
-				return fmt.Errorf("failed to create trader context: %w", err)
+			if err := tx.WithContext(ctx).Create(&uc).Error; err != nil {
+				return fmt.Errorf("failed to create user context: %w", err)
 			}
 			return nil
 		}
-		return fmt.Errorf("failed to query trader context: %w", result.Error)
+		return fmt.Errorf("failed to query user context: %w", result.Error)
 	}
 
-	// Merge existing auth context with pre-consignment context
 	var existingContext map[string]any
-	if len(tc.TraderContext) > 0 {
-		if err := json.Unmarshal(tc.TraderContext, &existingContext); err != nil {
-			return fmt.Errorf("failed to unmarshal existing trader context: %w", err)
+	if len(uc.UserContext) > 0 {
+		if err := json.Unmarshal(uc.UserContext, &existingContext); err != nil {
+			return fmt.Errorf("failed to unmarshal existing user context: %w", err)
 		}
 	} else {
 		existingContext = make(map[string]any)
 	}
 
-	// Append pre-consignment context (merge)
 	for k, v := range preConsignment.TraderContext {
 		existingContext[k] = v
 	}
 
-	// Save updated context back to auth table
 	updatedJSON, err := json.Marshal(existingContext)
 	if err != nil {
-		return fmt.Errorf("failed to marshal updated trader context: %w", err)
+		return fmt.Errorf("failed to marshal updated user context: %w", err)
 	}
 
-	tc.TraderContext = updatedJSON
-	if err := tx.WithContext(ctx).Save(&tc).Error; err != nil {
-		return fmt.Errorf("failed to update trader context: %w", err)
+	uc.UserContext = updatedJSON
+	if err := tx.WithContext(ctx).Save(&uc).Error; err != nil {
+		return fmt.Errorf("failed to update user context: %w", err)
 	}
 
 	return nil

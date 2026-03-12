@@ -234,17 +234,17 @@ func TestTokenExtractor_ExtractClaimsFromHeader(t *testing.T) {
 			}
 			got := ""
 			if claims != nil {
-				got = claims.TraderID
+				got = claims.UserID
 			}
 			if got != tt.want {
-				t.Errorf("ExtractClaimsFromHeader() got TraderID = %v, want %v", got, tt.want)
+				t.Errorf("ExtractClaimsFromHeader() got UserID = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-// TestTraderContextModel tests the TraderContext model structure
-func TestTraderContextModel(t *testing.T) {
+// TestUserContextModel tests the UserContext model structure
+func TestUserContextModel(t *testing.T) {
 	tests := []struct {
 		name      string
 		traderID  string
@@ -268,12 +268,12 @@ func TestTraderContextModel(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to marshal test context: %v", err)
 			}
-			traderCtx := &TraderContext{
-				TraderID:      tt.traderID,
-				TraderContext: contextJSON,
+			uc := &UserContext{
+				UserID:      tt.traderID,
+				UserContext: contextJSON,
 			}
 
-			got := traderCtx.TableName()
+			got := uc.TableName()
 			if got != tt.wantTable {
 				t.Errorf("TableName() got = %v, want %v", got, tt.wantTable)
 			}
@@ -284,21 +284,22 @@ func TestTraderContextModel(t *testing.T) {
 // TestAuthContextCreation tests AuthContext creation
 func TestAuthContextCreation(t *testing.T) {
 	contextJSON := json.RawMessage(`{"company": "Test Corp"}`)
-	tc := &TraderContext{
-		TraderID:      "TRADER-TEST",
-		TraderContext: contextJSON,
+	uc := &UserContext{
+		UserID:      "TRADER-TEST",
+		UserContext: contextJSON,
 	}
 
 	authCtx := &AuthContext{
-		TraderContext: tc,
+		UserID:      "TRADER-TEST",
+		UserContext: uc,
 	}
 
-	if authCtx.TraderID != "TRADER-TEST" {
-		t.Errorf("AuthContext.TraderID got = %v, want TRADER-TEST", authCtx.TraderID)
+	if authCtx.UserID != "TRADER-TEST" {
+		t.Errorf("AuthContext.UserID got = %v, want TRADER-TEST", authCtx.UserID)
 	}
 
-	if string(authCtx.TraderContext.TraderContext) != `{"company": "Test Corp"}` {
-		t.Errorf("AuthContext.TraderContext not preserved")
+	if string(authCtx.UserContext.UserContext) != `{"company": "Test Corp"}` {
+		t.Errorf("AuthContext.UserContext not preserved")
 	}
 }
 

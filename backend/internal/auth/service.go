@@ -9,155 +9,118 @@ import (
 	"gorm.io/gorm"
 )
 
-// AuthService provides business logic for authentication and trader context operations.
-// It handles database interactions for trader-related data.
+// AuthService provides business logic for authentication and user context operations.
+// It handles database interactions for user-related data.
 type AuthService struct {
 	db *gorm.DB
 }
 
 // NewAuthService creates a new AuthService instance
 func NewAuthService(db *gorm.DB) *AuthService {
-	return &AuthService{
-		db: db,
-	}
+	return &AuthService{db: db}
 }
 
-// GetTraderContext retrieves the trader context from the database for a given trader ID.
-// Returns nil if the trader is not found (indicating an unauthorized request).
+// GetUserContext retrieves the user context from the database for a given user ID.
+// Returns gorm.ErrRecordNotFound when the user has no context entry.
 //
 // This method is responsible for:
-// 1. Database lookup of trader context
+// 1. Database lookup of user context
 // 2. Handling not found errors gracefully
 // 3. Logging errors for debugging
 //
 // TODO_JWT_FUTURE: When JWT is implemented:
 // - This method will still be called the same way
 // - No changes needed here, token verification happens in token_parser.go
-// - Consider caching trader contexts for performance optimization
-func (as *AuthService) GetTraderContext(traderID string) (*TraderContext, error) {
-	if traderID == "" {
-		return nil, fmt.Errorf("trader ID is empty")
+// - Consider caching user contexts for performance optimization
+func (as *AuthService) GetUserContext(userID string) (*UserContext, error) {
+	if userID == "" {
+		return nil, fmt.Errorf("user ID is empty")
 	}
 
-	var traderCtx TraderContext
-	result := as.db.Where("trader_id = ?", traderID).First(&traderCtx)
-
+	var uc UserContext
+	result := as.db.Where("trader_id = ?", userID).First(&uc)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			slog.Debug("trader context not found", "trader_id", traderID)
+			slog.Debug("user context not found", "user_id", userID)
 			return nil, result.Error
 		}
-		slog.Error("failed to fetch trader context from database",
-			"trader_id", traderID,
-			"error", result.Error,
-		)
-		return nil, fmt.Errorf("failed to fetch trader context: %w", result.Error)
+		return nil, fmt.Errorf("failed to fetch user context: %w", result.Error)
 	}
 
-	return &traderCtx, nil
+	return &uc, nil
 }
 
-// UpdateTraderContext updates the trader context for a given trader ID.
+// UpdateUserContext updates the user context for a given user ID.
 // The context parameter should be a valid JSON serialized to json.RawMessage.
 //
 // This method handles:
-// 1. Validation of trader existence
-// 2. Database update of trader context
+// 1. Validation of user existence
+// 2. Database update of user context
 // 3. Error handling and logging
 //
 // Example usage:
 //
 //	newContext := json.RawMessage(`{"company": "Acme Inc", "role": "exporter"}`)
-//	err := authService.UpdateTraderContext("TRADER-001", newContext)
+//	err := authService.UpdateUserContext("TRADER-001", newContext)
 //
 // TODO_JWT_FUTURE: Consider adding:
 // - Audit logging for who/when/what changed
-// - Version tracking for trader context changes
+// - Version tracking for user context changes
 // - Webhook notifications on context updates
-func (as *AuthService) UpdateTraderContext(traderID string, context json.RawMessage) error {
-	if traderID == "" {
-		return fmt.Errorf("trader ID is empty")
+func (as *AuthService) UpdateUserContext(userID string, ctx json.RawMessage) error {
+	if userID == "" {
+		return fmt.Errorf("user ID is empty")
+	}
+	if len(ctx) == 0 {
+		return fmt.Errorf("user context is empty")
 	}
 
-	if len(context) == 0 {
-		return fmt.Errorf("trader context is empty")
-	}
-
-	// Validate JSON format
 	var jsonData interface{}
-	if err := json.Unmarshal(context, &jsonData); err != nil {
-		return fmt.Errorf("invalid JSON in trader context: %w", err)
+	if err := json.Unmarshal(ctx, &jsonData); err != nil {
+		return fmt.Errorf("invalid JSON in user context: %w", err)
 	}
 
-	// Update the trader context in the database
-	result := as.db.Model(&TraderContext{}).
-		Where("trader_id = ?", traderID).
-		Update("trader_context", context)
-
+	result := as.db.Model(&UserContext{}).
+		Where("trader_id = ?", userID).
+		Update("trader_context", ctx)
 	if result.Error != nil {
-		slog.Error("failed to update trader context in database",
-			"trader_id", traderID,
-			"error", result.Error,
-		)
-		return fmt.Errorf("failed to update trader context: %w", result.Error)
+		return fmt.Errorf("failed to update user context: %w", result.Error)
 	}
-
 	if result.RowsAffected == 0 {
-		slog.Warn("no trader context found to update",
-			"trader_id", traderID,
-		)
-		return fmt.Errorf("trader context not found for trader_id: %s", traderID)
+		return fmt.Errorf("user context not found for user_id: %s", userID)
 	}
-
-	slog.Debug("trader context updated successfully",
-		"trader_id", traderID,
-		"rows_affected", result.RowsAffected,
-	)
-
 	return nil
 }
 
-// UpsertTraderContext creates or updates the trader context.
-// If the trader doesn't exist, it will be created with the provided context.
+// UpsertUserContext creates or updates the user context.
+// If the user doesn't exist, it will be created with the provided context.
 // If it exists, the context will be updated.
 //
 // This is useful for initialization or bulk operations.
 //
 // TODO_JWT_FUTURE: This method might be useful when:
-// - Receiving trader context updates from external systems
-// - Initializing new traders during registration
+// - Receiving user context updates from external systems
+// - Initializing new users during registration
 // - Syncing with identity management systems
-func (as *AuthService) UpsertTraderContext(traderID string, context json.RawMessage) error {
-	if traderID == "" {
-		return fmt.Errorf("trader ID is empty")
+func (as *AuthService) UpsertUserContext(userID string, ctx json.RawMessage) error {
+	if userID == "" {
+		return fmt.Errorf("user ID is empty")
+	}
+	if len(ctx) == 0 {
+		return fmt.Errorf("user context is empty")
 	}
 
-	if len(context) == 0 {
-		return fmt.Errorf("trader context is empty")
-	}
-
-	// Validate JSON format
 	var jsonData interface{}
-	if err := json.Unmarshal(context, &jsonData); err != nil {
-		return fmt.Errorf("invalid JSON in trader context: %w", err)
+	if err := json.Unmarshal(ctx, &jsonData); err != nil {
+		return fmt.Errorf("invalid JSON in user context: %w", err)
 	}
 
-	result := as.db.Save(&TraderContext{
-		TraderID:      traderID,
-		TraderContext: context,
+	result := as.db.Save(&UserContext{
+		UserID:      userID,
+		UserContext: ctx,
 	})
-
 	if result.Error != nil {
-		slog.Error("failed to upsert trader context",
-			"trader_id", traderID,
-			"error", result.Error,
-		)
-		return fmt.Errorf("failed to upsert trader context: %w", result.Error)
+		return fmt.Errorf("failed to upsert user context: %w", result.Error)
 	}
-
-	slog.Debug("trader context upserted successfully",
-		"trader_id", traderID,
-	)
-
 	return nil
 }
