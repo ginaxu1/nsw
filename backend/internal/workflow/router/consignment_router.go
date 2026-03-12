@@ -85,6 +85,8 @@ func (c *ConsignmentRouter) HandleGetConsignments(w http.ResponseWriter, r *http
 		return
 	}
 
+	// TODO: Replace manual query param role-switching with claims-based RBAC
+	// once the auth provider supports custom role/profile claims.
 	role := r.URL.Query().Get("role")
 	if role == "" {
 		role = "trader"
