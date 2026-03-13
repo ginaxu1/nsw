@@ -28,11 +28,10 @@ type PreConsignment struct {
 	TraderID                 string              `gorm:"type:varchar(255);not null" json:"traderId"`
 	PreConsignmentTemplateID uuid.UUID           `gorm:"type:uuid;not null" json:"preConsignmentTemplateId"`
 	State                    PreConsignmentState `gorm:"type:varchar(50);not null" json:"state"`
-	TraderContext            map[string]any      `gorm:"type:jsonb;column:trader_context;serializer:json;not null" json:"traderContext"` // Context specific to the trader
 
 	// Relationships
 	PreConsignmentTemplate PreConsignmentTemplate `gorm:"foreignKey:PreConsignmentTemplateID;references:ID" json:"-"` // Associated PreConsignmentTemplate
-	WorkflowNodes          []WorkflowNode         `gorm:"foreignKey:PreConsignmentID;references:ID" json:"-"`         // Associated WorkflowNodes
+	Workflow               *Workflow              `gorm:"foreignKey:ID;references:ID" json:"-"`                       // Associated Workflow (1:1, same ID)
 }
 
 func (pc *PreConsignment) TableName() string {

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,33 +12,52 @@ import (
 	"gorm.io/gorm/clause"
 
 	"github.com/OpenNSW/nsw/internal/auth"
+	workflowmanager "github.com/OpenNSW/nsw/internal/workflow/manager"
 	"github.com/OpenNSW/nsw/internal/workflow/model"
 	"github.com/OpenNSW/nsw/utils"
 )
 
 // PreConsignmentService provides operations related to pre-consignments.
+// It also implements WorkflowEventHandler for domain-specific lifecycle callbacks.
 type PreConsignmentService struct {
-	db                          *gorm.DB
-	templateProvider            TemplateProvider
-	nodeRepo                    WorkflowNodeRepository
-	stateMachine                *WorkflowNodeStateMachine
-	preCommitValidationCallback func([]model.WorkflowNode, map[string]any) error
-}
-
-// SetPreCommitValidationCallback sets a callback to be executed before transaction commit
-// This allows external validation (like task manager registration) to participate in the transaction
-func (s *PreConsignmentService) SetPreCommitValidationCallback(callback func([]model.WorkflowNode, map[string]any) error) {
-	s.preCommitValidationCallback = callback
+	db               *gorm.DB
+	templateProvider TemplateProvider
+	workflowManager  workflowmanager.Manager
 }
 
 // NewPreConsignmentService creates a new instance of PreConsignmentService with the provided dependencies.
-func NewPreConsignmentService(db *gorm.DB, templateProvider TemplateProvider, nodeRepo WorkflowNodeRepository) *PreConsignmentService {
+func NewPreConsignmentService(db *gorm.DB, templateProvider TemplateProvider, workflowManager workflowmanager.Manager) *PreConsignmentService {
 	return &PreConsignmentService{
 		db:               db,
 		templateProvider: templateProvider,
-		nodeRepo:         nodeRepo,
-		stateMachine:     NewWorkflowNodeStateMachine(nodeRepo),
+		workflowManager:  workflowManager,
 	}
+}
+
+// --- WorkflowEventHandler implementation ---
+
+// OnWorkflowStatusChanged handles workflow lifecycle state propagation to pre-consignment domain state.
+func (s *PreConsignmentService) OnWorkflowStatusChanged(_ context.Context, tx *gorm.DB, workflowID uuid.UUID, _ model.WorkflowStatus, toStatus model.WorkflowStatus, workflow *model.Workflow) error {
+	var preConsignment model.PreConsignment
+	if err := tx.First(&preConsignment, "id = ?", workflowID).Error; err != nil {
+		return fmt.Errorf("failed to retrieve pre-consignment %s: %w", workflowID, err)
+	}
+
+	switch toStatus {
+	case model.WorkflowStatusCompleted:
+		preConsignment.State = model.PreConsignmentStateCompleted
+		if err := tx.Save(&preConsignment).Error; err != nil {
+			return fmt.Errorf("failed to update pre-consignment %s state to COMPLETED: %w", workflowID, err)
+		}
+		if workflow == nil {
+			return fmt.Errorf("workflow payload cannot be nil for completed state")
+		}
+		if err := s.syncTraderContextToAuth(tx, &preConsignment, workflow.GlobalContext); err != nil {
+			return fmt.Errorf("failed to sync trader context to auth: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // GetTraderPreConsignments retrieves a paginated list of pre-consignment templates and computes their state
@@ -139,20 +157,19 @@ func (s *PreConsignmentService) GetTraderPreConsignments(ctx context.Context, tr
 	}, nil
 }
 
-// InitializePreConsignment initializes a pre-consignment with its workflow nodes.
-// Returns the created pre-consignment response DTO and the new READY workflow nodes.
-// traderId and initialTraderContext are extracted from the auth context.
+// InitializePreConsignment initializes a pre-consignment with its workflow.
+// Returns the created pre-consignment response DTO.
 func (s *PreConsignmentService) InitializePreConsignment(
 	ctx context.Context,
 	createReq *model.CreatePreConsignmentDTO,
 	traderId string,
 	initialTraderContext map[string]any,
-) (*model.PreConsignmentResponseDTO, []model.WorkflowNode, error) {
+) (*model.PreConsignmentResponseDTO, error) {
 	if createReq == nil {
-		return nil, nil, fmt.Errorf("create request cannot be nil")
+		return nil, fmt.Errorf("create request cannot be nil")
 	}
 	if traderId == "" {
-		return nil, nil, fmt.Errorf("trader ID cannot be empty")
+		return nil, fmt.Errorf("trader ID cannot be empty")
 	}
 	if initialTraderContext == nil {
 		initialTraderContext = make(map[string]any)
@@ -167,11 +184,11 @@ func (s *PreConsignmentService) initializePreConsignmentInTx(
 	createReq *model.CreatePreConsignmentDTO,
 	traderId string,
 	initialTraderContext map[string]any,
-) (*model.PreConsignmentResponseDTO, []model.WorkflowNode, error) {
+) (*model.PreConsignmentResponseDTO, error) {
 	// Get pre-consignment template
 	var pcTemplate model.PreConsignmentTemplate
 	if err := s.db.WithContext(ctx).Where("id = ?", createReq.PreConsignmentTemplateID).First(&pcTemplate).Error; err != nil {
-		return nil, nil, fmt.Errorf("pre-consignment template %s not found: %w", createReq.PreConsignmentTemplateID, err)
+		return nil, fmt.Errorf("pre-consignment template %s not found: %w", createReq.PreConsignmentTemplateID, err)
 	}
 
 	// Validate dependencies are met
@@ -181,24 +198,17 @@ func (s *PreConsignmentService) initializePreConsignmentInTx(
 			Where("trader_id = ? AND pre_consignment_template_id IN ? AND state = ?",
 				traderId, pcTemplate.DependsOn, model.PreConsignmentStateCompleted).
 			Count(&completedCount).Error; err != nil {
-			return nil, nil, fmt.Errorf("failed to check dependency completion: %w", err)
+			return nil, fmt.Errorf("failed to check dependency completion: %w", err)
 		}
 		if int(completedCount) < len(pcTemplate.DependsOn) {
-			return nil, nil, fmt.Errorf("dependency pre-consignments are not all completed")
+			return nil, fmt.Errorf("dependency pre-consignments are not all completed")
 		}
 	}
 
 	// Fetch the workflow template referenced by the pre-consignment template
 	workflowTemplate, err := s.templateProvider.GetWorkflowTemplateByID(ctx, pcTemplate.WorkflowTemplateID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get workflow template %s: %w", pcTemplate.WorkflowTemplateID, err)
-	}
-
-	// Fetch node templates
-	nodeTemplateIDs := workflowTemplate.GetNodeTemplateIDs()
-	nodeTemplates, err := s.templateProvider.GetWorkflowNodeTemplatesByIDs(ctx, nodeTemplateIDs)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to retrieve workflow node templates: %w", err)
+		return nil, fmt.Errorf("failed to get workflow template %s: %w", pcTemplate.WorkflowTemplateID, err)
 	}
 
 	// Begin transaction
@@ -214,48 +224,39 @@ func (s *PreConsignmentService) initializePreConsignmentInTx(
 		TraderID:                 traderId,
 		PreConsignmentTemplateID: createReq.PreConsignmentTemplateID,
 		State:                    model.PreConsignmentStateInProgress,
-		TraderContext:            initialTraderContext,
 	}
 	if err := tx.Create(preConsignment).Error; err != nil {
 		tx.Rollback()
-		return nil, nil, fmt.Errorf("failed to create pre-consignment: %w", err)
+		return nil, fmt.Errorf("failed to create pre-consignment: %w", err)
 	}
 
-	// Create workflow nodes using the state machine
-	_, newReadyWorkflowNodes, _, err := s.stateMachine.InitializeNodesFromTemplates(
-		ctx, tx, ParentRef{PreConsignmentID: &preConsignment.ID}, nodeTemplates, []model.WorkflowTemplate{*workflowTemplate},
-	)
-	if err != nil {
+	// Register workflow with the manager (creates Workflow entity + nodes + registers with TM)
+	if err := s.workflowManager.StartWorkflowInstance(ctx, tx, preConsignment.ID, []model.WorkflowTemplate{*workflowTemplate}, initialTraderContext, s); err != nil {
 		tx.Rollback()
-		return nil, nil, fmt.Errorf("failed to create workflow nodes: %w", err)
-	}
-
-	// Execute pre-commit validation callback if set (e.g., task manager registration)
-	if s.preCommitValidationCallback != nil && len(newReadyWorkflowNodes) > 0 {
-		if err := s.preCommitValidationCallback(newReadyWorkflowNodes, preConsignment.TraderContext); err != nil {
-			tx.Rollback()
-			return nil, nil, fmt.Errorf("pre-commit validation failed: %w", err)
-		}
+		return nil, fmt.Errorf("failed to register workflow: %w", err)
 	}
 
 	// Commit transaction
 	if err := tx.Commit().Error; err != nil {
 		tx.Rollback()
-		return nil, nil, fmt.Errorf("failed to commit transaction: %w", err)
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	// Reload pre-consignment with preloaded relationships
+	// Reload pre-consignment with template for response
 	if err := s.db.WithContext(ctx).
 		Preload("PreConsignmentTemplate").
-		Preload("WorkflowNodes.WorkflowNodeTemplate").
 		First(preConsignment, "id = ?", preConsignment.ID).Error; err != nil {
-		return nil, nil, fmt.Errorf("failed to reload pre-consignment with relationships: %w", err)
+		return nil, fmt.Errorf("failed to reload pre-consignment: %w", err)
 	}
 
-	// Build response DTO
-	responseDTO := s.buildPreConsignmentResponseDTO(preConsignment)
+	// Get workflow details for response
+	wf, err := s.workflowManager.GetWorkflowInstance(ctx, preConsignment.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get workflow details: %w", err)
+	}
 
-	return responseDTO, newReadyWorkflowNodes, nil
+	responseDTO := s.buildPreConsignmentResponseDTO(preConsignment, wf)
+	return responseDTO, nil
 }
 
 // GetPreConsignmentsByTraderID retrieves all pre-consignments for a trader (excluding LOCKED state).
@@ -263,7 +264,6 @@ func (s *PreConsignmentService) GetPreConsignmentsByTraderID(ctx context.Context
 	var preConsignments []model.PreConsignment
 	result := s.db.WithContext(ctx).
 		Preload("PreConsignmentTemplate").
-		Preload("WorkflowNodes.WorkflowNodeTemplate").
 		Where("trader_id = ? AND state != ?", traderID, model.PreConsignmentStateLocked).
 		Find(&preConsignments)
 	if result.Error != nil {
@@ -276,7 +276,12 @@ func (s *PreConsignmentService) GetPreConsignmentsByTraderID(ctx context.Context
 
 	responseDTOs := make([]model.PreConsignmentResponseDTO, 0, len(preConsignments))
 	for i := range preConsignments {
-		responseDTO := s.buildPreConsignmentResponseDTO(&preConsignments[i])
+		// Get workflow details for each pre-consignment
+		wf, err := s.workflowManager.GetWorkflowInstance(ctx, preConsignments[i].ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get workflow details for pre-consignment %s: %w", preConsignments[i].ID, err)
+		}
+		responseDTO := s.buildPreConsignmentResponseDTO(&preConsignments[i], wf)
 		responseDTOs = append(responseDTOs, *responseDTO)
 	}
 
@@ -288,142 +293,32 @@ func (s *PreConsignmentService) GetPreConsignmentByID(ctx context.Context, preCo
 	var preConsignment model.PreConsignment
 	result := s.db.WithContext(ctx).
 		Preload("PreConsignmentTemplate").
-		Preload("WorkflowNodes.WorkflowNodeTemplate").
 		First(&preConsignment, "id = ?", preConsignmentID)
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to retrieve pre-consignment with ID %s: %w", preConsignmentID, result.Error)
 	}
 
-	responseDTO := s.buildPreConsignmentResponseDTO(&preConsignment)
+	wf, err := s.workflowManager.GetWorkflowInstance(ctx, preConsignment.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get workflow details: %w", err)
+	}
+
+	responseDTO := s.buildPreConsignmentResponseDTO(&preConsignment, wf)
 	return responseDTO, nil
 }
 
-// UpdateWorkflowNodeStateAndPropagateChanges updates the state of a workflow node belonging to a pre-consignment
-// and propagates changes to dependent nodes. Returns the new READY nodes and updated trader context.
-func (s *PreConsignmentService) UpdateWorkflowNodeStateAndPropagateChanges(ctx context.Context, updateReq *model.UpdateWorkflowNodeDTO) ([]model.WorkflowNode, map[string]any, error) {
-	if updateReq == nil {
-		return nil, nil, fmt.Errorf("update request cannot be nil")
-	}
-
-	tx := s.db.WithContext(ctx).Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
-
-	newReadyNodes, traderContext, err := s.updateWorkflowNodeStateAndPropagateChangesInTx(ctx, tx, updateReq)
-	if err != nil {
-		tx.Rollback()
-		return nil, nil, fmt.Errorf("failed to update workflow node state: %w", err)
-	}
-
-	if err := tx.Commit().Error; err != nil {
-		tx.Rollback()
-		return nil, nil, fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return newReadyNodes, traderContext, nil
-}
-
-// updateWorkflowNodeStateAndPropagateChangesInTx handles state transitions within a transaction.
-func (s *PreConsignmentService) updateWorkflowNodeStateAndPropagateChangesInTx(ctx context.Context, tx *gorm.DB, updateReq *model.UpdateWorkflowNodeDTO) ([]model.WorkflowNode, map[string]any, error) {
-	workflowNode, err := s.nodeRepo.GetWorkflowNodeByIDInTx(ctx, tx, updateReq.WorkflowNodeID)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to retrieve workflow node with ID %s: %w", updateReq.WorkflowNodeID, err)
-	}
-
-	var newReadyNodes []model.WorkflowNode
-
-	switch updateReq.State {
-	case model.WorkflowNodeStateFailed:
-		if workflowNode.State != model.WorkflowNodeStateFailed {
-			if err := s.stateMachine.TransitionToFailed(ctx, tx, workflowNode, updateReq); err != nil {
-				return nil, nil, fmt.Errorf("failed to transition node to FAILED: %w", err)
-			}
-		}
-
-	case model.WorkflowNodeStateInProgress:
-		if err := s.stateMachine.TransitionToInProgress(ctx, tx, workflowNode, updateReq); err != nil {
-			return nil, nil, fmt.Errorf("failed to transition node to IN_PROGRESS: %w", err)
-		}
-
-	case model.WorkflowNodeStateCompleted:
-		// First, append any context updates from this node completion
-		// This must happen BEFORE marking pre-consignment as complete
-		// to ensure the latest context is synced to auth
-		var traderContext map[string]any
-		traderContext, err = s.appendToPreConsignmentTraderContext(ctx, tx, *workflowNode.PreConsignmentID, updateReq.AppendGlobalContext)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		if workflowNode.State != model.WorkflowNodeStateCompleted {
-			if workflowNode.PreConsignmentID == nil {
-				return nil, nil, fmt.Errorf("node %s is not associated with a pre-consignment", workflowNode.ID)
-			}
-
-			result, err := s.stateMachine.TransitionToCompleted(ctx, tx, workflowNode, updateReq)
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to transition node to COMPLETED: %w", err)
-			}
-			newReadyNodes = result.NewReadyNodes
-
-			// Mark pre-consignment as completed if all nodes are done
-			// This will sync the updated trader context to auth
-			if result.WorkflowFinished {
-				if err := s.markPreConsignmentAsCompleted(ctx, tx, *workflowNode.PreConsignmentID); err != nil {
-					return nil, nil, err
-				}
-			}
-		}
-
-		return newReadyNodes, traderContext, nil
-	}
-
-	// Handle trader context updates for non-completed states
-	var traderContext map[string]any
-	traderContext, err = s.appendToPreConsignmentTraderContext(ctx, tx, *workflowNode.PreConsignmentID, updateReq.AppendGlobalContext)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return newReadyNodes, traderContext, nil
-}
-
-// markPreConsignmentAsCompleted updates the pre-consignment state to COMPLETED.
-func (s *PreConsignmentService) markPreConsignmentAsCompleted(ctx context.Context, tx *gorm.DB, preConsignmentID uuid.UUID) error {
-	var preConsignment model.PreConsignment
-	result := tx.WithContext(ctx).First(&preConsignment, "id = ?", preConsignmentID)
-	if result.Error != nil {
-		return fmt.Errorf("failed to retrieve pre-consignment %s: %w", preConsignmentID, result.Error)
-	}
-
-	preConsignment.State = model.PreConsignmentStateCompleted
-	if err := tx.WithContext(ctx).Save(&preConsignment).Error; err != nil {
-		return fmt.Errorf("failed to update pre-consignment %s state to COMPLETED: %w", preConsignmentID, err)
-	}
-
-	// Sync trader context to auth system
-	if err := s.syncTraderContextToAuth(ctx, tx, &preConsignment); err != nil {
-		return fmt.Errorf("failed to sync trader context to auth: %w", err)
-	}
-
-	return nil
-}
-
-// syncTraderContextToAuth synchronizes the pre-consignment trader context to the auth system.
+// syncTraderContextToAuth synchronizes the trader context (from the workflow's global context) to the auth system.
 // This is called when a pre-consignment is completed to persist accumulated context.
-func (s *PreConsignmentService) syncTraderContextToAuth(ctx context.Context, tx *gorm.DB, preConsignment *model.PreConsignment) error {
+func (s *PreConsignmentService) syncTraderContextToAuth(tx *gorm.DB, preConsignment *model.PreConsignment, traderContext map[string]any) error {
 	var uc auth.UserContext
-	result := tx.WithContext(ctx).
+	result := tx.
 		Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("user_id = ?", preConsignment.TraderID).
 		First(&uc)
 
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			contextJSON, err := json.Marshal(preConsignment.TraderContext)
+			contextJSON, err := json.Marshal(traderContext)
 			if err != nil {
 				return fmt.Errorf("failed to marshal user context: %w", err)
 			}
@@ -433,7 +328,7 @@ func (s *PreConsignmentService) syncTraderContextToAuth(ctx context.Context, tx 
 				UserContext: contextJSON,
 			}
 
-			if err := tx.WithContext(ctx).Create(&uc).Error; err != nil {
+			if err := tx.Create(&uc).Error; err != nil {
 				return fmt.Errorf("failed to create user context: %w", err)
 			}
 			return nil
@@ -450,7 +345,7 @@ func (s *PreConsignmentService) syncTraderContextToAuth(ctx context.Context, tx 
 		existingContext = make(map[string]any)
 	}
 
-	for k, v := range preConsignment.TraderContext {
+	for k, v := range traderContext {
 		existingContext[k] = v
 	}
 
@@ -460,52 +355,44 @@ func (s *PreConsignmentService) syncTraderContextToAuth(ctx context.Context, tx 
 	}
 
 	uc.UserContext = updatedJSON
-	if err := tx.WithContext(ctx).Save(&uc).Error; err != nil {
+	if err := tx.Save(&uc).Error; err != nil {
 		return fmt.Errorf("failed to update user context: %w", err)
 	}
 
 	return nil
 }
 
-// appendToPreConsignmentTraderContext appends key-value pairs to the pre-consignment's trader context.
-func (s *PreConsignmentService) appendToPreConsignmentTraderContext(ctx context.Context, tx *gorm.DB, preConsignmentID uuid.UUID, appendContext map[string]any) (map[string]any, error) {
-	var preConsignment model.PreConsignment
-	result := tx.WithContext(ctx).First(&preConsignment, "id = ?", preConsignmentID)
-	if result.Error != nil {
-		return nil, fmt.Errorf("failed to retrieve pre-consignment %s: %w", preConsignmentID, result.Error)
+// buildPreConsignmentResponseDTO builds a PreConsignmentResponseDTO from a PreConsignment.
+// The workflow parameter provides the workflow nodes and global context (trader context).
+func (s *PreConsignmentService) buildPreConsignmentResponseDTO(preConsignment *model.PreConsignment, workflow *model.Workflow) *model.PreConsignmentResponseDTO {
+	var nodeResponseDTOs []model.WorkflowNodeResponseDTO
+	if workflow != nil {
+		nodeResponseDTOs = make([]model.WorkflowNodeResponseDTO, 0, len(workflow.WorkflowNodes))
+		for _, node := range workflow.WorkflowNodes {
+			nodeResponseDTOs = append(nodeResponseDTOs, model.WorkflowNodeResponseDTO{
+				ID:        node.ID,
+				CreatedAt: node.CreatedAt.Format(time.RFC3339),
+				UpdatedAt: node.UpdatedAt.Format(time.RFC3339),
+				WorkflowNodeTemplate: model.WorkflowNodeTemplateResponseDTO{
+					Name:        node.WorkflowNodeTemplate.Name,
+					Description: node.WorkflowNodeTemplate.Description,
+					Type:        string(node.WorkflowNodeTemplate.Type),
+				},
+				State:         node.State,
+				ExtendedState: node.ExtendedState,
+				Outcome:       node.Outcome,
+				DependsOn:     node.DependsOn,
+			})
+		}
+	}
+	if nodeResponseDTOs == nil {
+		nodeResponseDTOs = []model.WorkflowNodeResponseDTO{}
 	}
 
-	if preConsignment.TraderContext == nil {
-		preConsignment.TraderContext = make(map[string]any)
-	}
-	maps.Copy(preConsignment.TraderContext, appendContext)
-
-	if err := tx.WithContext(ctx).Save(&preConsignment).Error; err != nil {
-		return nil, fmt.Errorf("failed to update pre-consignment %s trader context: %w", preConsignmentID, err)
-	}
-
-	return preConsignment.TraderContext, nil
-}
-
-// buildPreConsignmentResponseDTO builds a PreConsignmentResponseDTO from a PreConsignment with preloaded relationships.
-func (s *PreConsignmentService) buildPreConsignmentResponseDTO(preConsignment *model.PreConsignment) *model.PreConsignmentResponseDTO {
-	// Build WorkflowNodeResponseDTOs from preloaded nodes
-	nodeResponseDTOs := make([]model.WorkflowNodeResponseDTO, 0, len(preConsignment.WorkflowNodes))
-	for _, node := range preConsignment.WorkflowNodes {
-		nodeResponseDTOs = append(nodeResponseDTOs, model.WorkflowNodeResponseDTO{
-			ID:        node.ID,
-			CreatedAt: node.CreatedAt.Format(time.RFC3339),
-			UpdatedAt: node.UpdatedAt.Format(time.RFC3339),
-			WorkflowNodeTemplate: model.WorkflowNodeTemplateResponseDTO{
-				Name:        node.WorkflowNodeTemplate.Name,
-				Description: node.WorkflowNodeTemplate.Description,
-				Type:        string(node.WorkflowNodeTemplate.Type),
-			},
-			State:         node.State,
-			ExtendedState: node.ExtendedState,
-			Outcome:       node.Outcome,
-			DependsOn:     node.DependsOn,
-		})
+	// Populate TraderContext from the Workflow's GlobalContext for backward compatibility
+	var traderContext map[string]any
+	if workflow != nil {
+		traderContext = workflow.GlobalContext
 	}
 
 	dependsOn := preConsignment.PreConsignmentTemplate.DependsOn
@@ -517,7 +404,7 @@ func (s *PreConsignmentService) buildPreConsignmentResponseDTO(preConsignment *m
 		ID:            preConsignment.ID,
 		TraderID:      preConsignment.TraderID,
 		State:         preConsignment.State,
-		TraderContext: preConsignment.TraderContext,
+		TraderContext: traderContext,
 		CreatedAt:     preConsignment.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:     preConsignment.UpdatedAt.Format(time.RFC3339),
 		PreConsignmentTemplate: model.PreConsignmentTemplateResponseDTO{

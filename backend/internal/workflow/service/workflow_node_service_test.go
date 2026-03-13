@@ -47,7 +47,7 @@ func TestWorkflowNodeService_CreateWorkflowNodesInTx(t *testing.T) {
 
 	// Expectation: Create
 	sqlMock.ExpectExec(`INSERT INTO "workflow_nodes"`).
-		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	result, err := service.CreateWorkflowNodesInTx(ctx, tx, nodes)
@@ -76,84 +76,84 @@ func TestWorkflowNodeService_UpdateWorkflowNodesInTx(t *testing.T) {
 
 	// Expectation: Save (Update)
 	// Save updates all fields
-	sqlMock.ExpectExec(`UPDATE "workflow_nodes" SET "created_at"=\$1,"updated_at"=\$2,"consignment_id"=\$3,"pre_consignment_id"=\$4,"workflow_node_template_id"=\$5,"state"=\$6,"extended_state"=\$7,"outcome"=\$8,"depends_on"=\$9,"unlock_configuration"=\$10 WHERE "id" = \$11`).
-		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), "COMPLETED", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), nodeID).
+	sqlMock.ExpectExec(`UPDATE "workflow_nodes" SET "created_at"=\$1,"updated_at"=\$2,"workflow_id"=\$3,"workflow_node_template_id"=\$4,"state"=\$5,"extended_state"=\$6,"outcome"=\$7,"depends_on"=\$8,"unlock_configuration"=\$9 WHERE "id" = \$10`).
+		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), "COMPLETED", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), nodeID).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	err := service.UpdateWorkflowNodesInTx(ctx, tx, nodes)
 	assert.NoError(t, err)
 }
 
-func TestWorkflowNodeService_GetWorkflowNodesByConsignmentIDInTx(t *testing.T) {
+func TestWorkflowNodeService_GetWorkflowNodesByWorkflowIDInTx(t *testing.T) {
 	db, sqlMock := setupTestDB(t)
 	service := NewWorkflowNodeService(db)
 	ctx := context.Background()
 	sqlMock.ExpectBegin()
 	tx := db.Begin()
 
-	consignmentID := uuid.New()
+	workflowID := uuid.New()
 
-	sqlMock.ExpectQuery(`SELECT \* FROM "workflow_nodes" WHERE consignment_id = \$1`).
-		WithArgs(consignmentID).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "consignment_id"}).AddRow(uuid.New(), consignmentID))
+	sqlMock.ExpectQuery(`SELECT \* FROM "workflow_nodes" WHERE workflow_id = \$1`).
+		WithArgs(workflowID).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "workflow_id"}).AddRow(uuid.New(), workflowID))
 
-	result, err := service.GetWorkflowNodesByConsignmentIDInTx(ctx, tx, consignmentID)
+	result, err := service.GetWorkflowNodesByWorkflowIDInTx(ctx, tx, workflowID)
 	assert.NoError(t, err)
 	assert.Len(t, result, 1)
 }
 
-func TestWorkflowNodeService_CountIncompleteNodesByConsignmentID(t *testing.T) {
+func TestWorkflowNodeService_CountIncompleteNodesByWorkflowID(t *testing.T) {
 	db, sqlMock := setupTestDB(t)
 	service := NewWorkflowNodeService(db)
 	ctx := context.Background()
 	sqlMock.ExpectBegin()
 	tx := db.Begin()
 
-	consignmentID := uuid.New()
+	workflowID := uuid.New()
 
-	sqlMock.ExpectQuery(`SELECT count\(\*\) FROM "workflow_nodes" WHERE consignment_id = \$1 AND state != \$2`).
-		WithArgs(consignmentID, model.WorkflowNodeStateCompleted).
+	sqlMock.ExpectQuery(`SELECT count\(\*\) FROM "workflow_nodes" WHERE workflow_id = \$1 AND state != \$2`).
+		WithArgs(workflowID, model.WorkflowNodeStateCompleted).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 
-	count, err := service.CountIncompleteNodesByConsignmentID(ctx, tx, consignmentID)
+	count, err := service.CountIncompleteNodesByWorkflowID(ctx, tx, workflowID)
 	assert.NoError(t, err)
 	assert.Equal(t, int64(1), count)
 }
 
-func TestWorkflowNodeService_GetWorkflowNodesByPreConsignmentIDInTx(t *testing.T) {
+func TestWorkflowNodeService_GetWorkflowNodesByWorkflowIDInTx_PreConsignment(t *testing.T) {
 	db, sqlMock := setupTestDB(t)
 	service := NewWorkflowNodeService(db)
 	ctx := context.Background()
 	sqlMock.ExpectBegin()
 	tx := db.Begin()
 
-	pcID := uuid.New()
+	workflowID := uuid.New()
 	nodeID := uuid.New()
 
-	sqlMock.ExpectQuery(`SELECT \* FROM "workflow_nodes" WHERE pre_consignment_id = \$1`).
-		WithArgs(pcID).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "pre_consignment_id"}).AddRow(nodeID, pcID))
+	sqlMock.ExpectQuery(`SELECT \* FROM "workflow_nodes" WHERE workflow_id = \$1`).
+		WithArgs(workflowID).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "workflow_id"}).AddRow(nodeID, workflowID))
 
-	nodes, err := service.GetWorkflowNodesByPreConsignmentIDInTx(ctx, tx, pcID)
+	nodes, err := service.GetWorkflowNodesByWorkflowIDInTx(ctx, tx, workflowID)
 	assert.NoError(t, err)
 	assert.Len(t, nodes, 1)
 	assert.Equal(t, nodeID, nodes[0].ID)
 }
 
-func TestWorkflowNodeService_CountIncompleteNodesByPreConsignmentID(t *testing.T) {
+func TestWorkflowNodeService_CountIncompleteNodesByWorkflowID_PreConsignment(t *testing.T) {
 	db, sqlMock := setupTestDB(t)
 	service := NewWorkflowNodeService(db)
 	ctx := context.Background()
 	sqlMock.ExpectBegin()
 	tx := db.Begin()
 
-	pcID := uuid.New()
+	workflowID := uuid.New()
 
-	sqlMock.ExpectQuery(`SELECT count\(\*\) FROM "workflow_nodes" WHERE pre_consignment_id = \$1 AND state != \$2`).
-		WithArgs(pcID, model.WorkflowNodeStateCompleted).
+	sqlMock.ExpectQuery(`SELECT count\(\*\) FROM "workflow_nodes" WHERE workflow_id = \$1 AND state != \$2`).
+		WithArgs(workflowID, model.WorkflowNodeStateCompleted).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 
-	count, err := service.CountIncompleteNodesByPreConsignmentID(ctx, tx, pcID)
+	count, err := service.CountIncompleteNodesByWorkflowID(ctx, tx, workflowID)
 	assert.NoError(t, err)
 	assert.Equal(t, int64(1), count)
 }
@@ -178,7 +178,7 @@ func TestWorkflowNodeService_GetWorkflowNodesByIDsInTx(t *testing.T) {
 	assert.Len(t, nodes, 2)
 }
 
-func TestWorkflowNodeService_GetWorkflowNodesByConsignmentIDsInTx(t *testing.T) {
+func TestWorkflowNodeService_GetWorkflowNodesByWorkflowIDsInTx(t *testing.T) {
 	db, sqlMock := setupTestDB(t)
 	service := NewWorkflowNodeService(db)
 	ctx := context.Background()
@@ -189,11 +189,11 @@ func TestWorkflowNodeService_GetWorkflowNodesByConsignmentIDsInTx(t *testing.T) 
 	id2 := uuid.New()
 	ids := []uuid.UUID{id1, id2}
 
-	sqlMock.ExpectQuery(`SELECT \* FROM "workflow_nodes" WHERE consignment_id IN \(\$1,\$2\)`).
+	sqlMock.ExpectQuery(`SELECT \* FROM "workflow_nodes" WHERE workflow_id IN \(\$1,\$2\)`).
 		WithArgs(id1, id2).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "consignment_id"}).AddRow(uuid.New(), id1).AddRow(uuid.New(), id2))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "workflow_id"}).AddRow(uuid.New(), id1).AddRow(uuid.New(), id2))
 
-	nodes, err := service.GetWorkflowNodesByConsignmentIDsInTx(ctx, tx, ids)
+	nodes, err := service.GetWorkflowNodesByWorkflowIDsInTx(ctx, tx, ids)
 	assert.NoError(t, err)
 	assert.Len(t, nodes, 2)
 }

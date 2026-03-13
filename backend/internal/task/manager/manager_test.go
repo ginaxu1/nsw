@@ -493,45 +493,33 @@ func TestHandleGetTask(t *testing.T) {
 }
 
 func TestNotifyWorkflowManager(t *testing.T) {
-	t.Run("Channel Nil", func(t *testing.T) {
+	t.Run("Callback Nil", func(t *testing.T) {
 		tm := &taskManager{
-			completionChan: nil,
+			workflowUpdateHandler: nil,
 		}
 		// Should not panic
-		tm.notifyWorkflowManager(context.Background(), uuid.New(), nil, nil, nil, nil)
+		tm.notifyWorkflowUpdateHandler(context.Background(), uuid.New(), nil, nil, nil, nil)
 	})
 
-	t.Run("Channel Default Send", func(t *testing.T) {
-		ch := make(chan WorkflowManagerNotification, 1)
+	t.Run("Callback Invoked", func(t *testing.T) {
+		invoked := false
+		var gotTaskID uuid.UUID
+		var gotState *plugin.State
+
 		tm := &taskManager{
-			completionChan: ch,
+			workflowUpdateHandler: func(_ context.Context, taskID uuid.UUID, state *plugin.State, _ *string, _ map[string]any, _ *string) {
+				invoked = true
+				gotTaskID = taskID
+				gotState = state
+			},
 		}
 		taskID := uuid.New()
 		state := plugin.Completed
-		tm.notifyWorkflowManager(context.Background(), taskID, &state, nil, nil, nil)
+		tm.notifyWorkflowUpdateHandler(context.Background(), taskID, &state, nil, nil, nil)
 
-		select {
-		case n := <-ch:
-			assert.Equal(t, taskID, n.TaskID)
-			assert.Equal(t, &state, n.UpdatedState)
-		default:
-			t.Fatal("expected notification")
-		}
-	})
-
-	t.Run("Channel Full (Drop)", func(t *testing.T) {
-		ch := make(chan WorkflowManagerNotification, 1)
-		tm := &taskManager{
-			completionChan: ch,
-		}
-		// Fill channel
-		ch <- WorkflowManagerNotification{}
-
-		// Attempt verify non-blocking drop
-		taskID := uuid.New()
-		tm.notifyWorkflowManager(context.Background(), taskID, nil, nil, nil, nil)
-
-		assert.Len(t, ch, 1) // Should still have 1 item
+		assert.True(t, invoked)
+		assert.Equal(t, taskID, gotTaskID)
+		assert.Equal(t, &state, gotState)
 	})
 }
 
@@ -610,12 +598,10 @@ func TestNewTaskManager(t *testing.T) {
 	assert.NoError(t, err)
 
 	cfg := &config.Config{}
-	ch := make(chan WorkflowManagerNotification, 1)
-
 	// Since NewTaskStore connects to DB and migrates (maybe?), or just returns struct
 	// Here persistence.NewTaskStore(db) likely just returns struct.
 
-	tm, err := NewTaskManager(gormDB, ch, cfg, nil)
+	tm, err := NewTaskManager(gormDB, cfg, nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, tm)
 }

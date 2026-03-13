@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
@@ -11,19 +10,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/OpenNSW/nsw/internal/auth"
+	"github.com/OpenNSW/nsw/internal/app/bootstrap"
 	"github.com/OpenNSW/nsw/internal/config"
-	"github.com/OpenNSW/nsw/internal/database"
-	"github.com/OpenNSW/nsw/internal/form"
-	"github.com/OpenNSW/nsw/internal/middleware"
-	taskManager "github.com/OpenNSW/nsw/internal/task/manager"
-	"github.com/OpenNSW/nsw/internal/uploads"
-	"github.com/OpenNSW/nsw/internal/workflow"
 )
-
-// ChannelSize defines the buffer size for workflow node update notifications.
-// A larger buffer (1000) prevents notification drops during high load scenarios.
-const ChannelSize = 1000
 
 func main() {
 	// Load configuration from environment variables
@@ -58,97 +47,16 @@ func main() {
 		"port", cfg.Server.Port,
 	)
 
-	// Initialize database connection
-	db, err := database.New(&cfg.Database)
+	app, err := bootstrap.Build(context.Background(), cfg)
 	if err != nil {
-		log.Fatalf("failed to connect to database: %v", err)
+		log.Fatalf("failed to bootstrap application: %v", err)
 	}
 	defer func() {
-		if err := database.Close(db); err != nil {
-			slog.Error("failed to close database", "error", err)
+		if err := app.Close(); err != nil {
+			slog.Error("failed to close application", "error", err)
 		}
 	}()
-
-	// Perform health check
-	if err := database.HealthCheck(db); err != nil {
-		log.Fatalf("database health check failed: %v", err)
-	}
-
-	// Create task completion notification channel
-	ch := make(chan taskManager.WorkflowManagerNotification, ChannelSize)
-
-	// Initialize form service
-	formService := form.NewFormService(db)
-
-	// Initialize task manager with database connection
-	tm, err := taskManager.NewTaskManager(db, ch, cfg, formService)
-	if err != nil {
-		log.Fatalf("failed to create task manager: %v", err)
-	}
-
-	// Initialize workflow manager with database connection
-	wm := workflow.NewManager(tm, ch, db)
-
-	// Initialize storage driver and upload service
-	storageDriver, err := uploads.NewStorageFromConfig(context.Background(), cfg.Storage)
-	if err != nil {
-		log.Fatalf("failed to initialize storage: %v", err)
-	}
-	uploadService := uploads.NewUploadService(storageDriver)
-	uploadHandler := uploads.NewHTTPHandler(uploadService)
-
-	// Initialize authentication manager
-	authManager, err := auth.NewManager(db, cfg.Auth)
-	if err != nil {
-		log.Fatalf("failed to create auth manager: %v", err)
-	}
-	defer func() {
-		if err := authManager.Close(); err != nil {
-			slog.Error("failed to close auth manager", "error", err)
-		}
-	}()
-
-	// Verify auth system is healthy
-	if err := authManager.Health(); err != nil {
-		log.Fatalf("auth system health check failed: %v", err)
-	}
-
-	// Set up HTTP routes
-	mux := http.NewServeMux()
-
-	// V1 API routes (new refactored architecture)
-	mux.HandleFunc("POST /api/v1/tasks", tm.HandleExecuteTask)
-	mux.HandleFunc("GET /api/v1/tasks/{id}", tm.HandleGetTask)
-	mux.HandleFunc("GET /api/v1/hscodes", wm.HandleGetAllHSCodes)
-	mux.HandleFunc("GET /api/v1/chas", wm.HandleGetCHAs)
-	mux.HandleFunc("POST /api/v1/consignments", wm.HandleCreateConsignment)
-	mux.HandleFunc("GET /api/v1/consignments/{id}", wm.HandleGetConsignmentByID)
-	mux.HandleFunc("PUT /api/v1/consignments/{id}", wm.HandleInitializeConsignment)
-	mux.HandleFunc("GET /api/v1/consignments", wm.HandleGetConsignments)
-
-	// Pre-consignment routes
-	mux.HandleFunc("POST /api/v1/pre-consignments", wm.HandleCreatePreConsignment)
-	mux.HandleFunc("GET /api/v1/pre-consignments/{preConsignmentId}", wm.HandleGetPreConsignmentByID)
-	mux.HandleFunc("GET /api/v1/pre-consignments", wm.HandleGetPreConsignmentsByTraderID)
-
-	// Upload routes
-	mux.HandleFunc("POST /api/v1/uploads", uploadHandler.Upload)
-	mux.HandleFunc("GET /api/v1/uploads/{key}/content", uploadHandler.DownloadContent)
-	mux.HandleFunc("GET /api/v1/uploads/{key}", uploadHandler.Download)
-	mux.HandleFunc("DELETE /api/v1/uploads/{key}", uploadHandler.Delete)
-
-	// Set up graceful shutdown
-	serverAddr := fmt.Sprintf(":%d", cfg.Server.Port)
-
-	// Wrap handler with CORS and Auth middleware
-	// Order: CORS -> Auth -> Routes
-	// This ensures CORS headers are set before auth middleware processes the request
-	handler := middleware.CORS(&cfg.CORS)(authManager.Middleware()(mux))
-
-	server := &http.Server{
-		Addr:    serverAddr,
-		Handler: handler,
-	}
+	server := app.Server
 
 	// Channel to listen for interrupt signals
 	quit := make(chan os.Signal, 1)
@@ -177,10 +85,6 @@ func main() {
 	} else {
 		slog.Info("server gracefully stopped")
 	}
-
-	// Stop the workflow manager's task update listener
-	slog.Info("stopping task update listener...")
-	wm.StopWorkflowNodeUpdateListener()
 
 	slog.Info("server stopped")
 }

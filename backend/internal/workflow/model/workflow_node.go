@@ -42,8 +42,7 @@ func (wnt *WorkflowNodeTemplate) TableName() string {
 // WorkflowNode represents an instance of a workflow node within a workflow.
 type WorkflowNode struct {
 	BaseModel
-	ConsignmentID          *uuid.UUID        `gorm:"type:uuid;column:consignment_id" json:"consignmentId"`                                        // Reference to the Consignment, Null if PreConsignment nodes
-	PreConsignmentID       *uuid.UUID        `gorm:"type:uuid;column:pre_consignment_id" json:"preConsignmentId"`                                 // Reference to the PreConsignment, Null if Consignment nodes
+	WorkflowID             uuid.UUID         `gorm:"type:uuid;column:workflow_id;not null" json:"workflowId"`                                     // Reference to the parent Workflow
 	WorkflowNodeTemplateID uuid.UUID         `gorm:"type:uuid;column:workflow_node_template_id;not null" json:"workflowNodeTemplateId"`           // Reference to the WorkflowNodeTemplate
 	State                  WorkflowNodeState `gorm:"type:varchar(50);column:state;not null" json:"state"`                                         // State of the workflow node
 	ExtendedState          *string           `gorm:"type:text;column:extended_state" json:"extendedState"`                                        // Optional extended state information (e.g., error details)
@@ -52,8 +51,7 @@ type WorkflowNode struct {
 	UnlockConfiguration    *UnlockConfig     `gorm:"type:jsonb;column:unlock_configuration;serializer:json" json:"unlockConfiguration,omitempty"` // Resolved instance-level unlock configuration
 
 	// Relationships
-	Consignment          *Consignment         `gorm:"foreignKey:ConsignmentID;references:ID" json:"-"`                             // Associated Consignment
-	PreConsignment       *PreConsignment      `gorm:"foreignKey:PreConsignmentID;references:ID" json:"-"`                          // Associated PreConsignment
+	Workflow             *Workflow            `gorm:"foreignKey:WorkflowID;references:ID" json:"-"`                                // Associated Workflow
 	WorkflowNodeTemplate WorkflowNodeTemplate `gorm:"foreignKey:WorkflowNodeTemplateID;references:ID" json:"workflowNodeTemplate"` // Associated WorkflowNodeTemplate
 }
 

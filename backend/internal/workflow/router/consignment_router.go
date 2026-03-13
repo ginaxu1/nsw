@@ -47,7 +47,7 @@ func (c *ConsignmentRouter) HandleCreateConsignment(w http.ResponseWriter, r *ht
 
 	if req.ChaID != nil {
 		// Stage 1: create shell only
-		consignment, err := c.cs.CreateConsignmentShell(r.Context(), req.Flow, *req.ChaID, traderID, globalContext)
+		consignment, err := c.cs.CreateConsignmentShell(r.Context(), req.Flow, *req.ChaID, traderID)
 		if err != nil {
 			http.Error(w, "failed to create consignment: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -61,7 +61,7 @@ func (c *ConsignmentRouter) HandleCreateConsignment(w http.ResponseWriter, r *ht
 	}
 
 	// Legacy: full init with items
-	consignment, _, err := c.cs.InitializeConsignment(r.Context(), &req, traderID, globalContext)
+	consignment, err := c.cs.InitializeConsignment(r.Context(), &req, traderID, globalContext)
 	if err != nil {
 		http.Error(w, "failed to create consignment: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -181,7 +181,13 @@ func (c *ConsignmentRouter) HandleInitializeConsignment(w http.ResponseWriter, r
 		return
 	}
 
-	consignment, _, err := c.cs.InitializeConsignmentByID(r.Context(), consignmentID, req.HSCodeIDs)
+	globalContext, err := authCtx.GetUserContextMap()
+	if err != nil {
+		http.Error(w, "failed to parse user context", http.StatusInternalServerError)
+		return
+	}
+
+	consignment, err := c.cs.InitializeConsignmentByID(r.Context(), consignmentID, req.HSCodeIDs, globalContext)
 	if err != nil {
 		http.Error(w, "failed to initialize consignment: "+err.Error(), http.StatusInternalServerError)
 		return

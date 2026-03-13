@@ -95,64 +95,39 @@ func (s *WorkflowNodeService) UpdateWorkflowNodesInTx(ctx context.Context, tx *g
 	return nil
 }
 
-// GetWorkflowNodesByConsignmentIDInTx retrieves all workflow nodes associated with a given consignment ID within a transaction.
-func (s *WorkflowNodeService) GetWorkflowNodesByConsignmentIDInTx(ctx context.Context, tx *gorm.DB, consignmentID uuid.UUID) ([]model.WorkflowNode, error) {
+// GetWorkflowNodesByWorkflowIDInTx retrieves all workflow nodes associated with a given workflow ID within a transaction.
+func (s *WorkflowNodeService) GetWorkflowNodesByWorkflowIDInTx(ctx context.Context, tx *gorm.DB, workflowID uuid.UUID) ([]model.WorkflowNode, error) {
 	var nodes []model.WorkflowNode
-	result := tx.WithContext(ctx).Where("consignment_id = ?", consignmentID).Find(&nodes)
+	result := tx.WithContext(ctx).Where("workflow_id = ?", workflowID).Find(&nodes)
 	if result.Error != nil {
-		return nil, fmt.Errorf("failed to retrieve workflow nodes in transaction: %w", result.Error)
+		return nil, fmt.Errorf("failed to retrieve workflow nodes for workflow %s in transaction: %w", workflowID, result.Error)
 	}
 	return nodes, nil
 }
 
-// GetWorkflowNodesByConsignmentIDsInTx retrieves all workflow nodes associated with multiple consignment IDs within a transaction.
-// This method is optimized for batch operations to avoid N+1 query problems.
-func (s *WorkflowNodeService) GetWorkflowNodesByConsignmentIDsInTx(ctx context.Context, tx *gorm.DB, consignmentIDs []uuid.UUID) ([]model.WorkflowNode, error) {
-	if len(consignmentIDs) == 0 {
+// GetWorkflowNodesByWorkflowIDsInTx retrieves all workflow nodes associated with multiple workflow IDs within a transaction.
+func (s *WorkflowNodeService) GetWorkflowNodesByWorkflowIDsInTx(ctx context.Context, tx *gorm.DB, workflowIDs []uuid.UUID) ([]model.WorkflowNode, error) {
+	if len(workflowIDs) == 0 {
 		return []model.WorkflowNode{}, nil
 	}
 
 	var nodes []model.WorkflowNode
-	result := tx.WithContext(ctx).Where("consignment_id IN ?", consignmentIDs).Find(&nodes)
+	result := tx.WithContext(ctx).Where("workflow_id IN ?", workflowIDs).Find(&nodes)
 	if result.Error != nil {
-		return nil, fmt.Errorf("failed to retrieve workflow nodes for %d consignments in transaction: %w", len(consignmentIDs), result.Error)
+		return nil, fmt.Errorf("failed to retrieve workflow nodes for %d workflows in transaction: %w", len(workflowIDs), result.Error)
 	}
 	return nodes, nil
 }
 
-// CountIncompleteNodesByConsignmentID counts the number of incomplete workflow nodes for a given consignment.
-// This is more efficient than fetching all nodes when only checking completion status.
-func (s *WorkflowNodeService) CountIncompleteNodesByConsignmentID(ctx context.Context, tx *gorm.DB, consignmentID uuid.UUID) (int64, error) {
+// CountIncompleteNodesByWorkflowID counts the number of incomplete workflow nodes for a given workflow.
+func (s *WorkflowNodeService) CountIncompleteNodesByWorkflowID(ctx context.Context, tx *gorm.DB, workflowID uuid.UUID) (int64, error) {
 	var count int64
 	err := tx.WithContext(ctx).
 		Model(&model.WorkflowNode{}).
-		Where("consignment_id = ? AND state != ?", consignmentID, model.WorkflowNodeStateCompleted).
+		Where("workflow_id = ? AND state != ?", workflowID, model.WorkflowNodeStateCompleted).
 		Count(&count).Error
 	if err != nil {
-		return 0, fmt.Errorf("failed to count incomplete nodes for consignment %s: %w", consignmentID, err)
-	}
-	return count, nil
-}
-
-// GetWorkflowNodesByPreConsignmentIDInTx retrieves all workflow nodes associated with a given pre-consignment ID within a transaction.
-func (s *WorkflowNodeService) GetWorkflowNodesByPreConsignmentIDInTx(ctx context.Context, tx *gorm.DB, preConsignmentID uuid.UUID) ([]model.WorkflowNode, error) {
-	var nodes []model.WorkflowNode
-	result := tx.WithContext(ctx).Where("pre_consignment_id = ?", preConsignmentID).Find(&nodes)
-	if result.Error != nil {
-		return nil, fmt.Errorf("failed to retrieve workflow nodes for pre-consignment %s in transaction: %w", preConsignmentID, result.Error)
-	}
-	return nodes, nil
-}
-
-// CountIncompleteNodesByPreConsignmentID counts the number of incomplete workflow nodes for a given pre-consignment.
-func (s *WorkflowNodeService) CountIncompleteNodesByPreConsignmentID(ctx context.Context, tx *gorm.DB, preConsignmentID uuid.UUID) (int64, error) {
-	var count int64
-	err := tx.WithContext(ctx).
-		Model(&model.WorkflowNode{}).
-		Where("pre_consignment_id = ? AND state != ?", preConsignmentID, model.WorkflowNodeStateCompleted).
-		Count(&count).Error
-	if err != nil {
-		return 0, fmt.Errorf("failed to count incomplete nodes for pre-consignment %s: %w", preConsignmentID, err)
+		return 0, fmt.Errorf("failed to count incomplete nodes for workflow %s: %w", workflowID, err)
 	}
 	return count, nil
 }

@@ -80,7 +80,7 @@ func (r *PreConsignmentRouter) HandleCreatePreConsignment(w http.ResponseWriter,
 		return
 	}
 
-	preConsignment, _, err := r.pcs.InitializePreConsignment(req.Context(), &createReq, traderId, traderContext)
+	preConsignment, err := r.pcs.InitializePreConsignment(req.Context(), &createReq, traderId, traderContext)
 	if err != nil {
 		http.Error(w, "failed to create pre-consignment: "+err.Error(), http.StatusInternalServerError)
 		return
