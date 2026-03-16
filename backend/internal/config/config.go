@@ -9,13 +9,22 @@ import (
 	"strings"
 )
 
-// Config holds all configuration for the application
 type Config struct {
 	Database DatabaseConfig
 	Server   ServerConfig
 	CORS     CORSConfig
 	Storage  StorageConfig
 	Auth     AuthConfig
+	Payment  PaymentConfig
+}
+
+// PaymentConfig holds configuration for the External Payment integration
+type PaymentConfig struct {
+	MockMode      bool
+	Secret        string
+	MerchantID    string
+	CallbackURL   string
+	InquiryAPIKey string
 }
 
 // DatabaseConfig holds database connection configuration
@@ -127,6 +136,15 @@ func Load() (*Config, error) {
 			Audience:              getEnvOrDefault("AUTH_AUDIENCE", "TRADER_PORTAL_APP"),
 			ClientID:              getEnvOrDefault("AUTH_CLIENT_ID", "TRADER_PORTAL_APP"),
 			InsecureSkipTLSVerify: getBoolOrDefault("AUTH_JWKS_INSECURE_SKIP_VERIFY", defaultInsecureJWKS),
+		},
+		// TODO(Payment): When going live, consider changing defaults or failing startup
+		// if GOVPAY_SECRET or GOVPAY_MERCHANT_ID are missing in production.
+		Payment: PaymentConfig{
+			MockMode:      getBoolOrDefault("GOVPAY_MOCK_MODE", true),
+			Secret:        getEnvOrDefault("GOVPAY_SECRET", "mock-secret-key-12345"),
+			MerchantID:    getEnvOrDefault("GOVPAY_MERCHANT_ID", "mock-merchant-xyz"),
+			CallbackURL:   getEnvOrDefault("GOVPAY_CALLBACK_URL", "http://localhost:8080/api/v1/payments/govpay/callback"),
+			InquiryAPIKey: getEnvOrDefault("GOVPAY_INQUIRY_API_KEY", "mock-inquiry-key-123"),
 		},
 	}
 

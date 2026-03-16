@@ -24,13 +24,15 @@ type TaskFactory interface {
 type taskFactory struct {
 	config      *config.Config
 	formService form.FormService
+	repo        PaymentRepository
 }
 
 // NewTaskFactory creates a new TaskFactory instance
-func NewTaskFactory(cfg *config.Config, formService form.FormService) TaskFactory {
+func NewTaskFactory(cfg *config.Config, formService form.FormService, repo PaymentRepository) TaskFactory {
 	return &taskFactory{
 		config:      cfg,
 		formService: formService,
+		repo:        repo,
 	}
 }
 
@@ -43,7 +45,7 @@ func (f *taskFactory) BuildExecutor(ctx context.Context, taskType Type, config j
 		p, err := NewWaitForEventTask(config)
 		return Executor{Plugin: p, FSM: NewWaitForEventFSM()}, err
 	case TaskTypePayment:
-		p, err := NewPaymentTask(config)
+		p, err := NewPaymentTask(config, f.config, f.repo)
 		return Executor{Plugin: p, FSM: NewPaymentFSM()}, err
 	default:
 		return Executor{}, fmt.Errorf("unknown task type: %s", taskType)

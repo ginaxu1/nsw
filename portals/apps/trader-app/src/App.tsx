@@ -8,6 +8,7 @@ import {TaskDetailScreen} from "./screens/TaskDetailScreen.tsx";
 import {PreconsignmentScreen} from "./screens/PreconsignmentScreen.tsx"
 import {useAsgardeo, SignedOut} from '@asgardeo/react'
 import {LoginScreen} from "./screens/LoginScreen.tsx";
+import {MockPaymentScreen} from "./screens/dev/MockPaymentScreen.tsx";
 import {ApiProvider, useApi} from './services/ApiContext'
 import { UploadProvider } from '@opennsw/jsonforms-renderers'
 import { uploadFile, getDownloadUrl } from './services/upload'
@@ -50,6 +51,7 @@ function App() {
         <Route path="/consignments/:consignmentId/tasks/:taskId" element={<TaskDetailScreen/>}/>
         <Route path="/pre-consignments" element={<PreconsignmentScreen/>}/>
         <Route path="/pre-consignments/:preConsignmentId/tasks/:taskId" element={<TaskDetailScreen/>}/>
+        <Route path="/mock-payment" element={<MockPaymentScreen/>}/>
       </Route>
 
       <Route path="*" element={<Navigate to="/login" replace/>}/>

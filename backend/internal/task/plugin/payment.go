@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/OpenNSW/nsw/internal/config"
 )
 
 // ── Public API Actions ────────────────────────────────────────────────────────
@@ -38,18 +40,33 @@ const (
 // ── Local Store Keys ──────────────────────────────────────────────────────────
 
 const (
-	paymentStoreSession      = "payment:session"
-	paymentStoreTransactions = "payment:transactions"
+	paymentStoreSession = "payment:session"
 )
 
-// ── Config & Models ───────────────────────────────────────────────────────────
+// ── Models ─────────────────────────────────────────────────────────────
 
 // PaymentConfig holds the task-level configuration supplied at workflow definition time.
 type PaymentConfig struct {
 	Amount   float64 `json:"amount"`   // Amount to be paid
-	Currency string  `json:"currency"` // Currency of the payment (e.g. "USD")
+	Currency string  `json:"currency"` // Currency of the payment (e.g. "LKR")
 	Gateway  string  `json:"gateway"`  // Base URL of the payment gateway
 	TTL      int     `json:"ttl"`      // Time-to-live for a payment session in seconds
+}
+
+// PaymentTransactionDB maps to the payment_transactions table in the database
+type PaymentTransactionDB struct {
+	ID              uuid.UUID `gorm:"type:uuid;primary_key"`
+	TaskID          uuid.UUID `gorm:"type:uuid;not null;index"`
+	ExecutionID     string    `gorm:"type:varchar(100);not null;index"`
+	ReferenceNumber string    `gorm:"type:varchar(100);not null;unique"`
+	Status          string    `gorm:"type:varchar(50);not null;default:'PENDING'"`
+	Amount          float64   `gorm:"type:numeric(15,2);not null"`
+	CreatedAt       time.Time `gorm:"autoCreateTime"`
+	UpdatedAt       time.Time `gorm:"autoUpdateTime"`
+}
+
+func (PaymentTransactionDB) TableName() string {
+	return "payment_transactions"
 }
 
 // PaymentSession is the current active payment session persisted in local store.
@@ -59,20 +76,9 @@ type PaymentSession struct {
 	InitiatedAt   *time.Time `json:"initiatedAt,omitempty"` // set when INITIATE_PAYMENT is received
 }
 
-// PaymentTransaction is an append-only history entry for completed (failed/timed-out)
-// payment attempts. Callers can introduce new fields without handler changes.
-type PaymentTransaction struct {
-	TransactionID string    `json:"transactionId"`
-	InitiatedAt   time.Time `json:"initiatedAt"`
-	ResolvedAt    time.Time `json:"resolvedAt"`
-	Status        string    `json:"status"` // "FAILED" or "TIMEOUT"
-	Round         int       `json:"round"`
-}
-
 // PaymentRenderContent is the payload returned inside GetRenderInfoResponse.Content
-// when the plugin is in IDLE or IN_PROGRESS.
 type PaymentRenderContent struct {
-	GatewayURL string  `json:"gatewayUrl"`
+	GatewayURL string  `json:"gatewayUrl,omitempty"`
 	Amount     float64 `json:"amount"`
 	Currency   string  `json:"currency"`
 }
@@ -80,14 +86,6 @@ type PaymentRenderContent struct {
 // ── FSM ───────────────────────────────────────────────────────────────────────
 
 // NewPaymentFSM returns the state graph for the payment plugin.
-//
-// State graph:
-//
-//	""            ──START──────────────► IDLE          [no task state change]
-//	IDLE          ──INITIATE_PAYMENT──► IN_PROGRESS   [IN_PROGRESS]
-//	IN_PROGRESS   ──PAYMENT_SUCCESS───► COMPLETED     [COMPLETED]
-//	IN_PROGRESS   ──PAYMENT_FAILED────► IDLE          [INITIALIZED]
-//	IN_PROGRESS   ──PAYMENT_TIMEOUT───► IDLE          [INITIALIZED]
 func NewPaymentFSM() *PluginFSM {
 	return NewPluginFSM(map[TransitionKey]TransitionOutcome{
 		{"", FSMActionStart}:                              {string(paymentIdle), ""},
@@ -102,17 +100,19 @@ func NewPaymentFSM() *PluginFSM {
 
 // PaymentTask implements Plugin for the PAYMENT task type.
 type PaymentTask struct {
-	api    API
-	config PaymentConfig
+	api       API
+	config    PaymentConfig
+	appConfig *config.Config
+	repo      PaymentRepository
 }
 
 // NewPaymentTask creates a PaymentTask from the raw JSON configuration.
-func NewPaymentTask(raw json.RawMessage) (*PaymentTask, error) {
+func NewPaymentTask(raw json.RawMessage, appCfg *config.Config, repo PaymentRepository) (*PaymentTask, error) {
 	var cfg PaymentConfig
 	if err := json.Unmarshal(raw, &cfg); err != nil {
 		return nil, fmt.Errorf("payment: invalid config: %w", err)
 	}
-	return &PaymentTask{config: cfg}, nil
+	return &PaymentTask{config: cfg, appConfig: appCfg, repo: repo}, nil
 }
 
 func (t *PaymentTask) Init(api API) {
@@ -121,16 +121,27 @@ func (t *PaymentTask) Init(api API) {
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 
-func (t *PaymentTask) Start(_ context.Context) (*ExecutionResponse, error) {
+func (t *PaymentTask) Start(ctx context.Context) (*ExecutionResponse, error) {
 	if !t.api.CanTransition(FSMActionStart) {
 		return &ExecutionResponse{Message: "Payment task already started"}, nil
 	}
 
-	session := t.newSession()
+	// Generate payment reference and save to DB
+	record, err := t.createTransactionRecord(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Persist session to local store
+	session := PaymentSession{
+		TransactionID: record.ReferenceNumber,
+		GeneratedAt:   time.Now(),
+	}
 	if err := t.api.WriteToLocalStore(paymentStoreSession, &session); err != nil {
 		return nil, fmt.Errorf("payment: failed to persist initial session: %w", err)
 	}
 
+	// Transition to IN_PROGRESS state immediately
 	if err := t.api.Transition(FSMActionStart); err != nil {
 		return nil, err
 	}
@@ -143,7 +154,6 @@ func (t *PaymentTask) Start(_ context.Context) (*ExecutionResponse, error) {
 func (t *PaymentTask) GetRenderInfo(ctx context.Context) (*ApiResponse, error) {
 	pluginState := t.api.GetPluginState()
 
-	// Terminal state — nothing actionable to render.
 	if pluginState == string(paymentCompleted) {
 		return &ApiResponse{
 			Success: true,
@@ -164,33 +174,35 @@ func (t *PaymentTask) GetRenderInfo(ctx context.Context) (*ApiResponse, error) {
 		return nil, fmt.Errorf("payment: failed to read session: %w", err)
 	}
 
-	// Lazy timeout check: if we are IN_PROGRESS and the payment window has elapsed,
-	// transition back to IDLE and record the timeout.
-	if pluginState == string(paymentInProgress) && session.InitiatedAt != nil {
-		deadline := session.InitiatedAt.Add(t.ttlDuration() + PaymentThreshold)
+	// Lazy timeout check (if TTL is configured)
+	if t.config.TTL > 0 && pluginState == string(paymentInProgress) && session.InitiatedAt != nil {
+		deadline := session.InitiatedAt.Add(time.Duration(t.config.TTL)*time.Second + PaymentThreshold)
 		if time.Now().After(deadline) {
-			if err := t.recordTransaction(ctx, session.TransactionID, *session.InitiatedAt, "TIMEOUT"); err != nil {
-				return nil, fmt.Errorf("payment: failed to record timeout transaction: %w", err)
-			}
 			if err := t.api.Transition(paymentFSMTimeout); err != nil {
 				return nil, fmt.Errorf("payment: failed timeout transition: %w", err)
 			}
-			// Refresh plugin state after transition.
 			pluginState = t.api.GetPluginState()
 		}
 	}
 
-	// Rotate session if TTL has elapsed (applies to both IDLE and refreshed-from-timeout).
-	if time.Now().After(session.GeneratedAt.Add(t.ttlDuration())) {
-		newSess := t.newSession()
-		session = &newSess
+	// Lazy session rotation (if TTL is configured and state is IDLE or just timed out to IDLE)
+	if t.config.TTL > 0 && pluginState == string(paymentIdle) &&
+		time.Now().After(session.GeneratedAt.Add(time.Duration(t.config.TTL)*time.Second)) {
+		record, err := t.createTransactionRecord(ctx)
+		if err != nil {
+			return nil, err
+		}
+		session = &PaymentSession{
+			TransactionID: record.ReferenceNumber,
+			GeneratedAt:   time.Now(),
+		}
 		if err := t.api.WriteToLocalStore(paymentStoreSession, session); err != nil {
-			return nil, fmt.Errorf("payment: failed to persist rotated session: %w", err)
+			return nil, fmt.Errorf("payment: failed to rotate session: %w", err)
 		}
 	}
 
-	gatewayURL := fmt.Sprintf("%s?transactionId=%s&ts=%d",
-		t.config.Gateway, session.TransactionID, session.GeneratedAt.Unix())
+	// Generate Gateway URL based on mock mode
+	gatewayURL := t.getGatewayURL(session)
 
 	return &ApiResponse{
 		Success: true,
@@ -228,45 +240,67 @@ func (t *PaymentTask) Execute(ctx context.Context, request *ExecutionRequest) (*
 
 // ── Handlers ──────────────────────────────────────────────────────────────────
 
-// initiateHandler processes INITIATE_PAYMENT: validates the session is still within
-// TTL, stamps InitiatedAt, and transitions to IN_PROGRESS.
 func (t *PaymentTask) initiateHandler(ctx context.Context, content any) (*ExecutionResponse, error) {
 	if !t.api.CanTransition(PaymentActionInitiate) {
-		return nil, fmt.Errorf("payment: action %q not permitted in state %q",
-			PaymentActionInitiate, t.api.GetPluginState())
+		return nil, fmt.Errorf("payment: action %q not permitted", PaymentActionInitiate)
 	}
 
 	session, err := t.readSession(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("payment: failed to read session: %w", err)
+		return nil, err
 	}
 
-	// Reject if the session has expired — frontend should call GetRenderInfo for a fresh URL.
-	if time.Now().After(session.GeneratedAt.Add(t.ttlDuration())) {
+	// Check expiration
+	if t.config.TTL > 0 && time.Now().After(session.GeneratedAt.Add(time.Duration(t.config.TTL)*time.Second)) {
 		return &ExecutionResponse{
 			ApiResponse: &ApiResponse{
 				Success: false,
 				Error: &ApiError{
 					Code:    "SESSION_EXPIRED",
-					Message: "Payment session has expired. Please refresh to get a new payment URL.",
+					Message: "Payment session has expired. Please restart the payment process.",
 				},
 			},
-		}, fmt.Errorf("payment: session expired, cannot initiate payment")
+		}, fmt.Errorf("payment: session expired")
 	}
 
-	// Parse initiatedAt from content if provided, otherwise use current time.
-	now := time.Now()
-	if contentMap, ok := content.(map[string]any); ok {
-		if tsStr, ok := contentMap["initiatedAt"].(string); ok {
-			if parsed, err := time.Parse(time.RFC3339, tsStr); err == nil {
-				now = parsed
-			}
+	// Extract method from content
+	var method string
+	if m, ok := content.(map[string]any); ok {
+		if val, exists := m["method"]; exists {
+			method = fmt.Sprintf("%v", val)
 		}
 	}
 
+	now := time.Now()
 	session.InitiatedAt = &now
 	if err := t.api.WriteToLocalStore(paymentStoreSession, session); err != nil {
-		return nil, fmt.Errorf("payment: failed to persist initiated session: %w", err)
+		return nil, err
+	}
+
+	// Instant success for CARD in mock mode
+	if method == "CARD" && t.appConfig != nil && t.appConfig.Payment.MockMode {
+		if err := t.repo.UpdateTransactionStatus(ctx, session.TransactionID, "COMPLETED"); err != nil {
+			return nil, fmt.Errorf("payment: failed to update transaction status: %w", err)
+		}
+
+		// Perform both transitions: IDLE -> IN_PROGRESS -> COMPLETED
+		if err := t.api.Transition(PaymentActionInitiate); err != nil {
+			return nil, err
+		}
+		if err := t.api.Transition(PaymentActionSuccess); err != nil {
+			return nil, err
+		}
+
+		return &ExecutionResponse{
+			Message: "Payment completed successfully (Instant Card)",
+			ApiResponse: &ApiResponse{
+				Success: true,
+				Data: map[string]any{
+					"message":    "Payment completed successfully",
+					"gatewayUrl": "",
+				},
+			},
+		}, nil
 	}
 
 	if err := t.api.Transition(PaymentActionInitiate); err != nil {
@@ -277,16 +311,17 @@ func (t *PaymentTask) initiateHandler(ctx context.Context, content any) (*Execut
 		Message: "Payment initiated",
 		ApiResponse: &ApiResponse{
 			Success: true,
-			Data:    map[string]any{"message": "Payment initiated"},
+			Data: map[string]any{
+				"message":    "Payment initiated",
+				"gatewayUrl": t.getGatewayURL(session),
+			},
 		},
 	}, nil
 }
 
-// successHandler processes PAYMENT_SUCCESS: transitions to COMPLETED.
-func (t *PaymentTask) successHandler(_ context.Context) (*ExecutionResponse, error) {
+func (t *PaymentTask) successHandler(ctx context.Context) (*ExecutionResponse, error) {
 	if !t.api.CanTransition(PaymentActionSuccess) {
-		return nil, fmt.Errorf("payment: action %q not permitted in state %q",
-			PaymentActionSuccess, t.api.GetPluginState())
+		return nil, fmt.Errorf("payment: action %q not permitted", PaymentActionSuccess)
 	}
 
 	if err := t.api.Transition(PaymentActionSuccess); err != nil {
@@ -297,37 +332,26 @@ func (t *PaymentTask) successHandler(_ context.Context) (*ExecutionResponse, err
 		Message: "Payment completed successfully",
 		ApiResponse: &ApiResponse{
 			Success: true,
-			Data:    map[string]any{"message": "Payment completed successfully"},
 		},
 	}, nil
 }
 
-// failedHandler processes PAYMENT_FAILED: records the failed transaction,
-// generates a new session, and transitions back to IDLE.
 func (t *PaymentTask) failedHandler(ctx context.Context) (*ExecutionResponse, error) {
 	if !t.api.CanTransition(PaymentActionFailed) {
-		return nil, fmt.Errorf("payment: action %q not permitted in state %q",
-			PaymentActionFailed, t.api.GetPluginState())
+		return nil, fmt.Errorf("payment: action %q not permitted", PaymentActionFailed)
 	}
 
-	session, err := t.readSession(ctx)
+	record, err := t.createTransactionRecord(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("payment: failed to read session: %w", err)
+		return nil, err
 	}
 
-	// Record the failed transaction in history.
-	initiatedAt := time.Now()
-	if session.InitiatedAt != nil {
-		initiatedAt = *session.InitiatedAt
+	newSession := PaymentSession{
+		TransactionID: record.ReferenceNumber,
+		GeneratedAt:   time.Now(),
 	}
-	if err := t.recordTransaction(ctx, session.TransactionID, initiatedAt, "FAILED"); err != nil {
-		return nil, fmt.Errorf("payment: failed to record failed transaction: %w", err)
-	}
-
-	// Generate a fresh session for the next attempt.
-	newSess := t.newSession()
-	if err := t.api.WriteToLocalStore(paymentStoreSession, &newSess); err != nil {
-		return nil, fmt.Errorf("payment: failed to persist new session after failure: %w", err)
+	if err := t.api.WriteToLocalStore(paymentStoreSession, &newSession); err != nil {
+		return nil, fmt.Errorf("payment: failed to write session: %w", err)
 	}
 
 	if err := t.api.Transition(PaymentActionFailed); err != nil {
@@ -338,12 +362,11 @@ func (t *PaymentTask) failedHandler(ctx context.Context) (*ExecutionResponse, er
 		Message: "Payment failed, new session generated",
 		ApiResponse: &ApiResponse{
 			Success: true,
-			Data:    map[string]any{"message": "Payment failed. A new payment session is available."},
 		},
 	}, nil
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Helper Methods ────────────────────────────────────────────────────────────
 
 // newSession creates a fresh PaymentSession with a new UUID and the current timestamp.
 func (t *PaymentTask) newSession() PaymentSession {
@@ -353,13 +376,16 @@ func (t *PaymentTask) newSession() PaymentSession {
 	}
 }
 
-// ttlDuration returns the configured TTL as a time.Duration.
-func (t *PaymentTask) ttlDuration() time.Duration {
-	return time.Duration(t.config.TTL) * time.Second
+func (t *PaymentTask) getGatewayURL(session *PaymentSession) string {
+	if t.appConfig != nil && t.appConfig.Payment.MockMode {
+		return fmt.Sprintf("http://localhost:5173/mock-payment?ref=%s", session.TransactionID)
+	} else if t.config.Gateway != "" {
+		return fmt.Sprintf("%s?ref=%s", t.config.Gateway, session.TransactionID)
+	}
+	// Default to GovPay production URL
+	return fmt.Sprintf("https://www.lpopp.lk/pay?ref=%s", session.TransactionID)
 }
 
-// readSession reads and deserialises the current PaymentSession from local store.
-// It handles the JSON round-trip that occurs on a cache miss (map[string]any → PaymentSession).
 func (t *PaymentTask) readSession(_ context.Context) (*PaymentSession, error) {
 	raw, err := t.api.ReadFromLocalStore(paymentStoreSession)
 	if err != nil {
@@ -369,66 +395,46 @@ func (t *PaymentTask) readSession(_ context.Context) (*PaymentSession, error) {
 		return nil, fmt.Errorf("no active payment session")
 	}
 
-	// Fast path: already the correct type (in-memory cache hit).
-	if s, ok := raw.(PaymentSession); ok {
-		return &s, nil
+	if s, ok := raw.(*PaymentSession); ok {
+		return s, nil
 	}
 
-	// Slow path: JSON round-trip after cache miss / persistence reload.
 	b, err := json.Marshal(raw)
 	if err != nil {
-		return nil, fmt.Errorf("payment: failed to marshal stored session: %w", err)
+		return nil, fmt.Errorf("failed to marshal stored session: %w", err)
 	}
 	var s PaymentSession
 	if err := json.Unmarshal(b, &s); err != nil {
-		return nil, fmt.Errorf("payment: failed to unmarshal stored session: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal stored session: %w", err)
 	}
 	return &s, nil
 }
 
-// readTransactionHistory reads and deserialises the payment transaction history from local store.
-func (t *PaymentTask) readTransactionHistory(_ context.Context) ([]PaymentTransaction, error) {
-	raw, err := t.api.ReadFromLocalStore(paymentStoreTransactions)
-	if err != nil {
-		return nil, err
-	}
-	if raw == nil {
-		return nil, nil // no history yet
+// ── Inquiry Methods ───────────────────────────────────────────────────────────
+
+func (t *PaymentTask) createTransactionRecord(ctx context.Context) (*PaymentTransactionDB, error) {
+	referenceNumber := uuid.New().String()
+	record := PaymentTransactionDB{
+		ID:              uuid.New(),
+		TaskID:          t.api.GetTaskID(),
+		ExecutionID:     uuid.New().String(), // Unique ID per payment attempt
+		ReferenceNumber: referenceNumber,
+		Status:          "PENDING",
+		Amount:          t.config.Amount,
 	}
 
-	// Fast path.
-	if h, ok := raw.([]PaymentTransaction); ok {
-		return h, nil
+	if err := t.repo.CreateTransaction(ctx, &record); err != nil {
+		return nil, fmt.Errorf("payment: failed to persist transaction record: %w", err)
 	}
-
-	// Slow path: JSON round-trip.
-	b, err := json.Marshal(raw)
-	if err != nil {
-		return nil, fmt.Errorf("payment: failed to marshal stored transactions: %w", err)
-	}
-	var h []PaymentTransaction
-	if err := json.Unmarshal(b, &h); err != nil {
-		return nil, fmt.Errorf("payment: failed to unmarshal stored transactions: %w", err)
-	}
-	return h, nil
+	return &record, nil
 }
 
-// recordTransaction appends a PaymentTransaction to the local store history.
-func (t *PaymentTask) recordTransaction(ctx context.Context, transactionID string, initiatedAt time.Time, status string) error {
-	history, err := t.readTransactionHistory(ctx)
-	if err != nil {
-		return fmt.Errorf("payment: failed to read transaction history: %w", err)
-	}
-	entry := PaymentTransaction{
-		TransactionID: transactionID,
-		InitiatedAt:   initiatedAt,
-		ResolvedAt:    time.Now(),
-		Status:        status,
-		Round:         len(history) + 1,
-	}
-	history = append(history, entry)
-	if err := t.api.WriteToLocalStore(paymentStoreTransactions, history); err != nil {
-		return fmt.Errorf("payment: failed to persist transaction history: %w", err)
-	}
-	return nil
+// GetTransactionByExecutionID retrieves the payment record for a specific FSM execution.
+func (t *PaymentTask) GetTransactionByExecutionID(ctx context.Context, execID string) (*PaymentTransactionDB, error) {
+	return t.repo.GetTransactionByExecutionID(ctx, execID)
+}
+
+// GetTransactionByReference retrieves the payment record using the external reference.
+func (t *PaymentTask) GetTransactionByReference(ctx context.Context, ref string) (*PaymentTransactionDB, error) {
+	return t.repo.GetTransactionByReference(ctx, ref)
 }

@@ -85,8 +85,10 @@ func NewTaskManager(db *gorm.DB, cfg *config.Config, formService form.FormServic
 	// Initialize container cache with capacity of 100 active containers
 	cache := newContainerCache(100)
 
+	paymentRepo := persistence.NewPaymentRepository(db)
+
 	return &taskManager{
-		factory:        plugin.NewTaskFactory(cfg, formService),
+		factory:        plugin.NewTaskFactory(cfg, formService, paymentRepo),
 		store:          store,
 		config:         cfg,
 		containerCache: cache,

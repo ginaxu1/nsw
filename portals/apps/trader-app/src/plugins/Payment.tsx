@@ -61,7 +61,7 @@ export default function Payment(props: {
     return message.toLowerCase().includes("session expired")
   }
 
-  const handlePayNow = async () => {
+  const handlePayNow = async (method: 'CARD' | 'BANK_APP') => {
     if (!workflowId || !taskId) {
       setSubmitError("Workflow ID or Task ID is missing.")
       return
@@ -78,11 +78,11 @@ export default function Payment(props: {
       return
     }
 
-    const initiatePayment = async (allowRetry: boolean): Promise<boolean> => {
+    const initiatePayment = async (allowRetry: boolean): Promise<any> => {
       try {
-        const response = await sendTaskAction(taskId, workflowId, "INITIATE_PAYMENT")
+        const response = await sendTaskAction(taskId, workflowId, "INITIATE_PAYMENT", { method })
         if (response.success) {
-          return true
+          return response
         }
 
         if (allowRetry && isSessionExpiredResponse(response)) {
@@ -91,7 +91,7 @@ export default function Payment(props: {
         }
 
         setSubmitError(response.error?.message ?? "Failed to initiate payment.")
-        return false
+        return null
       } catch (err) {
         if (allowRetry && isSessionExpiredError(err)) {
           await refreshGatewaySession()
@@ -100,7 +100,7 @@ export default function Payment(props: {
 
         console.error("Error initiating payment:", err)
         setSubmitError("Failed to initiate payment. Please try again.")
-        return false
+        return null
       }
     }
 
@@ -108,12 +108,24 @@ export default function Payment(props: {
     setSubmitError(null)
 
     try {
-      const initiated = await initiatePayment(true)
-      if (!initiated) {
+      const response = await initiatePayment(true)
+      if (!response) {
         return
       }
 
-      setIsPopupOpen(true)
+      const nextUrl = (response.data as any)?.gatewayUrl
+      if (nextUrl) {
+        window.location.href = nextUrl
+      } else if (method === 'CARD' && response.success) {
+        // Instant success: refresh task state
+        if (props.onTaskUpdated) {
+          await props.onTaskUpdated()
+        } else {
+          window.location.reload()
+        }
+      } else {
+        setIsPopupOpen(true)
+      }
     } finally {
       setIsInitiating(false)
     }
@@ -157,9 +169,14 @@ export default function Payment(props: {
       </div>
 
       {!isCompleted && (
-        <Button onClick={() => { void handlePayNow() }} disabled={isInitiating} size="3">
-          {isInitiating ? "Initiating..." : "Pay Now"}
-        </Button>
+        <Flex gap="3">
+          <Button onClick={() => { void handlePayNow('CARD') }} disabled={isInitiating} size="3" color="blue">
+            {isInitiating ? "Initiating..." : "Pay with Credit Card"}
+          </Button>
+          <Button onClick={() => { void handlePayNow('BANK_APP') }} disabled={isInitiating} size="3" variant="soft">
+            {isInitiating ? "Initiating..." : "Pay with Banking App"}
+          </Button>
+        </Flex>
       )}
 
       <Dialog.Root open={isPopupOpen} onOpenChange={setIsPopupOpen}>
