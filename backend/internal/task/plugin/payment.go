@@ -348,7 +348,7 @@ func (t *PaymentTask) failedHandler(ctx context.Context) (*ExecutionResponse, er
 // newSession creates a fresh PaymentSession with a new UUID and the current timestamp.
 func (t *PaymentTask) newSession() PaymentSession {
 	return PaymentSession{
-		TransactionID: uuid.New().String(),
+		TransactionID: uuid.NewString(),
 		GeneratedAt:   time.Now(),
 	}
 }

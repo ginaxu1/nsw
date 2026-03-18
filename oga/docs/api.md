@@ -29,8 +29,8 @@ POST /api/oga/inject
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `taskId` | UUID | Yes | Task identifier from the workflow |
-| `workflowId` | UUID | Yes | Parent workflow identifier |
+| `taskId` | string | Yes | Task identifier from the workflow |
+| `workflowId` | string | Yes | Parent workflow identifier |
 | `serviceUrl` | string | Yes | Callback URL where review results will be POSTed |
 | `data` | object | No | Trader-submitted data to display during review |
 | `meta` | object | No | Metadata for form selection (see [Dynamic Forms](dynamic-forms.md)) |
@@ -137,7 +137,7 @@ GET /api/oga/applications/{taskId}
 
 | Parameter | Type | Description |
 |---|---|---|
-| `taskId` | UUID | The application's task identifier |
+| `taskId` | string | The application's task identifier |
 
 **Example Request**
 
@@ -200,7 +200,7 @@ POST /api/oga/applications/{taskId}/review
 
 | Parameter | Type | Description |
 |---|---|---|
-| `taskId` | UUID | The application's task identifier |
+| `taskId` | string | The application's task identifier |
 
 **Request Body**
 

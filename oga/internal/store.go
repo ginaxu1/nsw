@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -45,8 +44,8 @@ func (j *JSONB) Scan(value any) error {
 
 // ApplicationRecord represents an application in the OGA database
 type ApplicationRecord struct {
-	TaskID             uuid.UUID        `gorm:"type:uuid;primaryKey"`
-	WorkflowID         uuid.UUID        `gorm:"type:uuid;index;not null"`
+	TaskID             string           `gorm:"type:text;primaryKey"`
+	WorkflowID         string           `gorm:"type:text;index;not null"`
 	ServiceURL         string           `gorm:"type:varchar(512);not null"`                  // URL to send response back to
 	Data               JSONB            `gorm:"type:text"`                                   // Injected data from service
 	Meta               JSONB            `gorm:"type:text"`                                   // Meta Information on Rendering the form
@@ -93,7 +92,7 @@ func (s *ApplicationStore) CreateOrUpdate(app *ApplicationRecord) error {
 }
 
 // GetByTaskID retrieves an application by task ID
-func (s *ApplicationStore) GetByTaskID(taskID uuid.UUID) (*ApplicationRecord, error) {
+func (s *ApplicationStore) GetByTaskID(taskID string) (*ApplicationRecord, error) {
 	var app ApplicationRecord
 	if err := s.db.First(&app, "task_id = ?", taskID).Error; err != nil {
 		return nil, err
@@ -122,7 +121,7 @@ func (s *ApplicationStore) List(ctx context.Context, status string, offset, limi
 	return apps, total, nil
 }
 
-func (s *ApplicationStore) UpdateStatus(taskID uuid.UUID, status string, reviewerResponse map[string]any) error {
+func (s *ApplicationStore) UpdateStatus(taskID string, status string, reviewerResponse map[string]any) error {
 	now := time.Now()
 
 	// Marshal the map to JSON
@@ -150,7 +149,7 @@ func (s *ApplicationStore) UpdateStatus(taskID uuid.UUID, status string, reviewe
 
 // AppendFeedback appends a feedback entry to the application's history and sets
 // the status to FEEDBACK_REQUESTED.
-func (s *ApplicationStore) AppendFeedback(taskID uuid.UUID, entry map[string]any) error {
+func (s *ApplicationStore) AppendFeedback(taskID string, entry map[string]any) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		var app ApplicationRecord
 		if err := tx.First(&app, "task_id = ?", taskID).Error; err != nil {
@@ -173,7 +172,7 @@ func (s *ApplicationStore) AppendFeedback(taskID uuid.UUID, entry map[string]any
 
 // UpdateDataAndResetStatus updates the submitted data and resets status to PENDING.
 // Called when a trader resubmits after receiving feedback.
-func (s *ApplicationStore) UpdateDataAndResetStatus(taskID uuid.UUID, data map[string]any) error {
+func (s *ApplicationStore) UpdateDataAndResetStatus(taskID string, data map[string]any) error {
 	dataJSON, err := json.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("failed to marshal data: %w", err)
@@ -188,7 +187,7 @@ func (s *ApplicationStore) UpdateDataAndResetStatus(taskID uuid.UUID, data map[s
 }
 
 // Delete removes an application by task ID
-func (s *ApplicationStore) Delete(taskID uuid.UUID) error {
+func (s *ApplicationStore) Delete(taskID string) error {
 	return s.db.Delete(&ApplicationRecord{}, "task_id = ?", taskID).Error
 }
 

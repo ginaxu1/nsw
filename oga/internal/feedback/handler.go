@@ -5,14 +5,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
-
-	"github.com/google/uuid"
 )
 
 // Service is a narrow interface for feedback operations, avoiding a circular
 // import with the parent internal package.
 type Service interface {
-	FeedbackApplication(ctx context.Context, taskID uuid.UUID, content map[string]any) error
+	FeedbackApplication(ctx context.Context, taskID string, content map[string]any) error
 }
 
 type Handler struct {
@@ -25,9 +23,8 @@ func NewHandler(service Service) *Handler {
 
 func (h *Handler) HandleFeedback(w http.ResponseWriter, r *http.Request) {
 	taskIDStr := r.PathValue("taskId")
-	taskID, err := uuid.Parse(taskIDStr)
-	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, "invalid taskId format")
+	if strings.TrimSpace(taskIDStr) == "" {
+		writeJSONError(w, http.StatusBadRequest, "taskId is required")
 		return
 	}
 
@@ -37,14 +34,14 @@ func (h *Handler) HandleFeedback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-    feedback, ok := body["feedback"].(string)
+	feedback, ok := body["feedback"].(string)
 
 	if !ok || strings.TrimSpace(feedback) == "" {
 		writeJSONError(w, http.StatusBadRequest, "feedback field is required and must be a non-empty string")
 		return
 	}
 
-	if err := h.service.FeedbackApplication(r.Context(), taskID, body); err != nil {
+	if err := h.service.FeedbackApplication(r.Context(), taskIDStr, body); err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to send feedback: "+err.Error())
 		return
 	}

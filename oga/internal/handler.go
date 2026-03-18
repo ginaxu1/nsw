@@ -6,8 +6,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
-
-	"github.com/google/uuid"
 )
 
 // OGAHandler handles HTTP requests for OGA portal operations
@@ -22,20 +20,14 @@ func NewOGAHandler(service OGAService) *OGAHandler {
 	}
 }
 
-// parseTaskID extracts and parses the taskId from the request path
-func (h *OGAHandler) parseTaskID(w http.ResponseWriter, r *http.Request) (uuid.UUID, error) {
+// parseTaskID extracts the taskId from the request path.
+func (h *OGAHandler) parseTaskID(w http.ResponseWriter, r *http.Request) (string, error) {
 	taskIDStr := r.PathValue("taskId")
 	if taskIDStr == "" {
 		WriteJSONError(w, http.StatusBadRequest, "taskId is required")
-		return uuid.Nil, errors.New("taskId is required")
+		return "", errors.New("taskId is required")
 	}
-
-	taskID, err := uuid.Parse(taskIDStr)
-	if err != nil {
-		WriteJSONError(w, http.StatusBadRequest, "invalid taskId format")
-		return uuid.Nil, err
-	}
-	return taskID, nil
+	return taskIDStr, nil
 }
 
 // HandleInjectData handles POST /api/oga/inject

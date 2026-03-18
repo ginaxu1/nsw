@@ -28,7 +28,7 @@ type MockTemplateProvider struct {
 	mock.Mock
 }
 
-func (m *MockTemplateProvider) GetWorkflowTemplateByHSCodeIDAndFlow(ctx context.Context, id uuid.UUID, flow model.ConsignmentFlow) (*model.WorkflowTemplate, error) {
+func (m *MockTemplateProvider) GetWorkflowTemplateByHSCodeIDAndFlow(ctx context.Context, id string, flow model.ConsignmentFlow) (*model.WorkflowTemplate, error) {
 	args := m.Called(ctx, id, flow)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -36,7 +36,7 @@ func (m *MockTemplateProvider) GetWorkflowTemplateByHSCodeIDAndFlow(ctx context.
 	return args.Get(0).(*model.WorkflowTemplate), args.Error(1)
 }
 
-func (m *MockTemplateProvider) GetWorkflowTemplateByID(ctx context.Context, id uuid.UUID) (*model.WorkflowTemplate, error) {
+func (m *MockTemplateProvider) GetWorkflowTemplateByID(ctx context.Context, id string) (*model.WorkflowTemplate, error) {
 	args := m.Called(ctx, id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -44,12 +44,12 @@ func (m *MockTemplateProvider) GetWorkflowTemplateByID(ctx context.Context, id u
 	return args.Get(0).(*model.WorkflowTemplate), args.Error(1)
 }
 
-func (m *MockTemplateProvider) GetWorkflowNodeTemplatesByIDs(ctx context.Context, ids []uuid.UUID) ([]model.WorkflowNodeTemplate, error) {
+func (m *MockTemplateProvider) GetWorkflowNodeTemplatesByIDs(ctx context.Context, ids []string) ([]model.WorkflowNodeTemplate, error) {
 	args := m.Called(ctx, ids)
 	return args.Get(0).([]model.WorkflowNodeTemplate), args.Error(1)
 }
 
-func (m *MockTemplateProvider) GetWorkflowNodeTemplateByID(ctx context.Context, id uuid.UUID) (*model.WorkflowNodeTemplate, error) {
+func (m *MockTemplateProvider) GetWorkflowNodeTemplateByID(ctx context.Context, id string) (*model.WorkflowNodeTemplate, error) {
 	args := m.Called(ctx, id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -70,12 +70,12 @@ type MockWorkflowManager struct {
 	mock.Mock
 }
 
-func (m *MockWorkflowManager) StartWorkflowInstance(ctx context.Context, tx *gorm.DB, workflowID uuid.UUID, workflowTemplates []model.WorkflowTemplate, globalContext map[string]any, handler workflowmanager.WorkflowEventHandler) error {
+func (m *MockWorkflowManager) StartWorkflowInstance(ctx context.Context, tx *gorm.DB, workflowID string, workflowTemplates []model.WorkflowTemplate, globalContext map[string]any, handler workflowmanager.WorkflowEventHandler) error {
 	args := m.Called(ctx, tx, workflowID, workflowTemplates, globalContext, handler)
 	return args.Error(0)
 }
 
-func (m *MockWorkflowManager) GetWorkflowInstance(ctx context.Context, workflowID uuid.UUID) (*model.Workflow, error) {
+func (m *MockWorkflowManager) GetWorkflowInstance(ctx context.Context, workflowID string) (*model.Workflow, error) {
 	args := m.Called(ctx, workflowID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -129,7 +129,7 @@ func TestConsignmentRouter_HandleGetConsignmentByID(t *testing.T) {
 	svc := service.NewConsignmentService(db, nil, mockWM)
 	r := NewConsignmentRouter(svc, nil)
 
-	consignmentID := uuid.New()
+	consignmentID := uuid.NewString()
 	sqlMock.MatchExpectationsInOrder(false)
 	sqlMock.ExpectQuery("(?i)SELECT .* FROM \"consignments\"").WillReturnRows(sqlmock.NewRows([]string{"id", "state"}).AddRow(consignmentID, "IN_PROGRESS"))
 
@@ -141,8 +141,8 @@ func TestConsignmentRouter_HandleGetConsignmentByID(t *testing.T) {
 
 	sqlMock.ExpectQuery("(?i)SELECT .* FROM \"hs_codes\"").WillReturnRows(sqlmock.NewRows([]string{"id"}))
 
-	req, _ := http.NewRequest("GET", "/api/v1/consignments/"+consignmentID.String(), nil)
-	req.SetPathValue("id", consignmentID.String())
+	req, _ := http.NewRequest("GET", "/api/v1/consignments/"+consignmentID, nil)
+	req.SetPathValue("id", consignmentID)
 
 	w := httptest.NewRecorder()
 	r.HandleGetConsignmentByID(w, req)
@@ -157,8 +157,8 @@ func TestConsignmentRouter_HandleGetConsignments(t *testing.T) {
 	traderID := "trader1"
 	sqlMock.MatchExpectationsInOrder(false)
 	sqlMock.ExpectQuery("(?i)SELECT count").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
-	sqlMock.ExpectQuery("(?i)SELECT .* FROM \"consignments\"").WillReturnRows(sqlmock.NewRows([]string{"id", "trader_id"}).AddRow(uuid.New(), traderID))
-	sqlMock.ExpectQuery("(?i)SELECT .* FROM \"workflow_nodes\"").WillReturnRows(sqlmock.NewRows([]string{"workflow_id", "total", "completed"}).AddRow(uuid.New(), 1, 0))
+	sqlMock.ExpectQuery("(?i)SELECT .* FROM \"consignments\"").WillReturnRows(sqlmock.NewRows([]string{"id", "trader_id"}).AddRow(uuid.NewString(), traderID))
+	sqlMock.ExpectQuery("(?i)SELECT .* FROM \"workflow_nodes\"").WillReturnRows(sqlmock.NewRows([]string{"workflow_id", "total", "completed"}).AddRow(uuid.NewString(), 1, 0))
 	sqlMock.ExpectQuery("(?i)SELECT .* FROM \"workflows\"").WillReturnRows(sqlmock.NewRows([]string{"id", "end_node_id"}))
 
 	req, _ := http.NewRequest("GET", "/api/v1/consignments?role=trader", nil)
@@ -176,10 +176,10 @@ func TestConsignmentRouter_HandleCreateConsignment(t *testing.T) {
 	r := NewConsignmentRouter(svc, nil)
 
 	traderID := "trader1"
-	hsCodeID := uuid.New()
-	templateID := uuid.New()
-	nodeTemplateID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
-	consignmentID := uuid.New()
+	hsCodeID := uuid.NewString()
+	templateID := uuid.NewString()
+	nodeTemplateID := "00000000-0000-0000-0000-000000000001"
+	consignmentID := uuid.NewString()
 
 	payload := model.CreateConsignmentDTO{
 		Flow: model.ConsignmentFlowImport,
@@ -189,25 +189,25 @@ func TestConsignmentRouter_HandleCreateConsignment(t *testing.T) {
 	}
 	body, _ := json.Marshal(payload)
 
-	tp.On("GetWorkflowTemplateByHSCodeIDAndFlow", mock.Anything, mock.Anything, mock.Anything).Return(&model.WorkflowTemplate{BaseModel: model.BaseModel{ID: templateID}, NodeTemplates: []uuid.UUID{nodeTemplateID}}, nil)
+	tp.On("GetWorkflowTemplateByHSCodeIDAndFlow", mock.Anything, mock.Anything, mock.Anything).Return(&model.WorkflowTemplate{BaseModel: model.BaseModel{ID: templateID}, NodeTemplates: []string{nodeTemplateID}}, nil)
 
 	sqlMock.MatchExpectationsInOrder(false)
 	sqlMock.ExpectBegin()
 	sqlMock.ExpectExec("(?i)INSERT INTO \"consignments\"").WillReturnResult(sqlmock.NewResult(1, 1))
 
-	mockWM.On("StartWorkflowInstance", mock.Anything, mock.Anything, mock.AnythingOfType("uuid.UUID"), mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	mockWM.On("StartWorkflowInstance", mock.Anything, mock.Anything, mock.AnythingOfType("string"), mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	sqlMock.ExpectCommit()
 
 	// Post-commit reloads
 	sqlMock.ExpectQuery("(?i)SELECT .* FROM \"consignments\"").WillReturnRows(sqlmock.NewRows([]string{"id", "state"}).AddRow(consignmentID, "IN_PROGRESS"))
 
-	mockWM.On("GetWorkflowInstance", mock.Anything, mock.AnythingOfType("uuid.UUID")).Return(&model.Workflow{
+	mockWM.On("GetWorkflowInstance", mock.Anything, mock.AnythingOfType("string")).Return(&model.Workflow{
 		BaseModel: model.BaseModel{ID: consignmentID},
 		Status:    model.WorkflowStatusInProgress,
 		WorkflowNodes: []model.WorkflowNode{
 			{
-				BaseModel:              model.BaseModel{ID: uuid.New()},
+				BaseModel:              model.BaseModel{ID: uuid.NewString()},
 				WorkflowNodeTemplateID: nodeTemplateID,
 				State:                  model.WorkflowNodeStateReady,
 				WorkflowNodeTemplate: model.WorkflowNodeTemplate{
@@ -233,7 +233,7 @@ func TestHSCodeRouter_HandleGetAllHSCodes(t *testing.T) {
 	r := NewHSCodeRouter(svc)
 
 	sqlMock.ExpectQuery("(?i)SELECT count").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
-	sqlMock.ExpectQuery("(?i)SELECT .* FROM \"hs_codes\"").WillReturnRows(sqlmock.NewRows([]string{"id", "hs_code"}).AddRow(uuid.New(), "1234.56"))
+	sqlMock.ExpectQuery("(?i)SELECT .* FROM \"hs_codes\"").WillReturnRows(sqlmock.NewRows([]string{"id", "hs_code"}).AddRow(uuid.NewString(), "1234.56"))
 
 	req, _ := http.NewRequest("GET", "/api/v1/hscodes", nil)
 	w := httptest.NewRecorder()
@@ -247,9 +247,9 @@ func TestPreConsignmentRouter_HandleGetPreConsignmentByID(t *testing.T) {
 	svc := service.NewPreConsignmentService(db, nil, mockWM)
 	r := NewPreConsignmentRouter(svc)
 
-	id := uuid.New()
-	templateID := uuid.New()
-	nodeTemplateID := uuid.New()
+	id := uuid.NewString()
+	templateID := uuid.NewString()
+	nodeTemplateID := uuid.NewString()
 
 	sqlMock.MatchExpectationsInOrder(false)
 	sqlMock.ExpectQuery("(?i)SELECT .* FROM \"pre_consignments\"").WillReturnRows(sqlmock.NewRows([]string{"id", "pre_consignment_template_id"}).AddRow(id, templateID))
@@ -260,7 +260,7 @@ func TestPreConsignmentRouter_HandleGetPreConsignmentByID(t *testing.T) {
 		Status:    model.WorkflowStatusInProgress,
 		WorkflowNodes: []model.WorkflowNode{
 			{
-				BaseModel:              model.BaseModel{ID: uuid.New()},
+				BaseModel:              model.BaseModel{ID: uuid.NewString()},
 				WorkflowNodeTemplateID: nodeTemplateID,
 				State:                  model.WorkflowNodeStateReady,
 				WorkflowNodeTemplate: model.WorkflowNodeTemplate{
@@ -271,8 +271,8 @@ func TestPreConsignmentRouter_HandleGetPreConsignmentByID(t *testing.T) {
 		},
 	}, nil)
 
-	req, _ := http.NewRequest("GET", "/api/v1/pre-consignments/"+id.String(), nil)
-	req.SetPathValue("preConsignmentId", id.String())
+	req, _ := http.NewRequest("GET", "/api/v1/pre-consignments/"+id, nil)
+	req.SetPathValue("preConsignmentId", id)
 	w := httptest.NewRecorder()
 	r.HandleGetPreConsignmentByID(w, req)
 	assert.Equal(t, http.StatusOK, w.Code)
@@ -286,8 +286,8 @@ func TestPreConsignmentRouter_HandleGetTraderPreConsignments(t *testing.T) {
 	traderID := "trader1"
 	sqlMock.MatchExpectationsInOrder(false)
 	sqlMock.ExpectQuery("(?i)SELECT count").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
-	sqlMock.ExpectQuery("(?i)SELECT .* FROM \"pre_consignment_templates\"").WillReturnRows(sqlmock.NewRows([]string{"id", "name"}).AddRow(uuid.New(), "Template"))
-	sqlMock.ExpectQuery("(?i)SELECT .* FROM .pre_consignments.").WillReturnRows(sqlmock.NewRows([]string{"id", "trader_id", "pre_consignment_template_id"}).AddRow(uuid.New(), traderID, uuid.New()))
+	sqlMock.ExpectQuery("(?i)SELECT .* FROM \"pre_consignment_templates\"").WillReturnRows(sqlmock.NewRows([]string{"id", "name"}).AddRow(uuid.NewString(), "Template"))
+	sqlMock.ExpectQuery("(?i)SELECT .* FROM .pre_consignments.").WillReturnRows(sqlmock.NewRows([]string{"id", "trader_id", "pre_consignment_template_id"}).AddRow(uuid.NewString(), traderID, uuid.NewString()))
 	sqlMock.ExpectQuery("(?i)SELECT .* FROM .pre_consignment_templates.").WillReturnRows(sqlmock.NewRows([]string{"id", "name"}))
 
 	req, _ := http.NewRequest("GET", "/api/v1/pre-consignments/templates", nil)
@@ -305,24 +305,24 @@ func TestPreConsignmentRouter_HandleCreatePreConsignment(t *testing.T) {
 	r := NewPreConsignmentRouter(svc)
 
 	traderID := "trader1"
-	templateID := uuid.New()
-	nodeTemplateID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
-	preConsignmentID := uuid.New()
+	templateID := uuid.NewString()
+	nodeTemplateID := "00000000-0000-0000-0000-000000000001"
+	preConsignmentID := uuid.NewString()
 
 	payload := model.CreatePreConsignmentDTO{
 		PreConsignmentTemplateID: templateID,
 	}
 	body, _ := json.Marshal(payload)
 
-	tp.On("GetWorkflowTemplateByID", mock.Anything, mock.Anything).Return(&model.WorkflowTemplate{BaseModel: model.BaseModel{ID: templateID}, NodeTemplates: []uuid.UUID{nodeTemplateID}}, nil)
+	tp.On("GetWorkflowTemplateByID", mock.Anything, mock.Anything).Return(&model.WorkflowTemplate{BaseModel: model.BaseModel{ID: templateID}, NodeTemplates: []string{nodeTemplateID}}, nil)
 
 	sqlMock.MatchExpectationsInOrder(false)
-	sqlMock.ExpectQuery("(?i)SELECT .* FROM \"pre_consignment_templates\"").WillReturnRows(sqlmock.NewRows([]string{"id", "workflow_template_id", "depends_on"}).AddRow(templateID, uuid.New(), []byte("[]")))
+	sqlMock.ExpectQuery("(?i)SELECT .* FROM \"pre_consignment_templates\"").WillReturnRows(sqlmock.NewRows([]string{"id", "workflow_template_id", "depends_on"}).AddRow(templateID, uuid.NewString(), []byte("[]")))
 
 	sqlMock.ExpectBegin()
 	sqlMock.ExpectExec("(?i)INSERT INTO \"pre_consignments\"").WillReturnResult(sqlmock.NewResult(1, 1))
 
-	mockWM.On("StartWorkflowInstance", mock.Anything, mock.Anything, mock.AnythingOfType("uuid.UUID"), mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	mockWM.On("StartWorkflowInstance", mock.Anything, mock.Anything, mock.AnythingOfType("string"), mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	sqlMock.ExpectCommit()
 
@@ -330,12 +330,12 @@ func TestPreConsignmentRouter_HandleCreatePreConsignment(t *testing.T) {
 	sqlMock.ExpectQuery("(?i)SELECT .* FROM \"pre_consignments\"").WillReturnRows(sqlmock.NewRows([]string{"id", "pre_consignment_template_id"}).AddRow(preConsignmentID, templateID))
 	sqlMock.ExpectQuery("(?i)SELECT .* FROM \"pre_consignment_templates\"").WillReturnRows(sqlmock.NewRows([]string{"id", "name"}).AddRow(templateID, "Template"))
 
-	mockWM.On("GetWorkflowInstance", mock.Anything, mock.AnythingOfType("uuid.UUID")).Return(&model.Workflow{
+	mockWM.On("GetWorkflowInstance", mock.Anything, mock.AnythingOfType("string")).Return(&model.Workflow{
 		BaseModel: model.BaseModel{ID: preConsignmentID},
 		Status:    model.WorkflowStatusInProgress,
 		WorkflowNodes: []model.WorkflowNode{
 			{
-				BaseModel:              model.BaseModel{ID: uuid.New()},
+				BaseModel:              model.BaseModel{ID: uuid.NewString()},
 				WorkflowNodeTemplateID: nodeTemplateID,
 				State:                  model.WorkflowNodeStateReady,
 				WorkflowNodeTemplate: model.WorkflowNodeTemplate{
@@ -374,7 +374,7 @@ func TestConsignmentRouter_HandleGetConsignmentByID_InvalidID(t *testing.T) {
 	req.SetPathValue("id", "invalid-uuid")
 	w := httptest.NewRecorder()
 	r.HandleGetConsignmentByID(w, req)
-	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
 
 func TestConsignmentRouter_HandleGetConsignments_PaginationError(t *testing.T) {
@@ -396,11 +396,11 @@ func TestConsignmentRouter_HandleGetConsignmentByID_ServiceError(t *testing.T) {
 	svc := service.NewConsignmentService(db, nil, nil)
 	r := NewConsignmentRouter(svc, nil)
 
-	id := uuid.New()
+	id := uuid.NewString()
 	sqlMock.ExpectQuery("(?i)SELECT .* FROM \"consignments\"").WillReturnError(fmt.Errorf("db error"))
 
-	req, _ := http.NewRequest("GET", "/api/v1/consignments/"+id.String(), nil)
-	req.SetPathValue("id", id.String())
+	req, _ := http.NewRequest("GET", "/api/v1/consignments/"+id, nil)
+	req.SetPathValue("id", id)
 
 	w := httptest.NewRecorder()
 	r.HandleGetConsignmentByID(w, req)
@@ -481,18 +481,18 @@ func TestPreConsignmentRouter_HandleGetPreConsignmentByID_InvalidID(t *testing.T
 	req.SetPathValue("preConsignmentId", "invalid-uuid")
 	w := httptest.NewRecorder()
 	r.HandleGetPreConsignmentByID(w, req)
-	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
 
 func TestPreConsignmentRouter_HandleGetPreConsignmentByID_ServiceError(t *testing.T) {
 	db, sqlMock := setupRouterTestDB(t)
 	r := NewPreConsignmentRouter(service.NewPreConsignmentService(db, nil, nil))
 
-	id := uuid.New()
+	id := uuid.NewString()
 	sqlMock.ExpectQuery("(?i)SELECT .* FROM \"pre_consignments\"").WillReturnError(fmt.Errorf("db error"))
 
-	req, _ := http.NewRequest("GET", "/api/v1/pre-consignments/"+id.String(), nil)
-	req.SetPathValue("preConsignmentId", id.String())
+	req, _ := http.NewRequest("GET", "/api/v1/pre-consignments/"+id, nil)
+	req.SetPathValue("preConsignmentId", id)
 	w := httptest.NewRecorder()
 	r.HandleGetPreConsignmentByID(w, req)
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
@@ -513,7 +513,7 @@ func TestPreConsignmentRouter_HandleCreatePreConsignment_ServiceError(t *testing
 	tp := new(MockTemplateProvider)
 	r := NewPreConsignmentRouter(service.NewPreConsignmentService(db, tp, nil))
 
-	templateID := uuid.New()
+	templateID := uuid.NewString()
 	sqlMock.ExpectQuery("(?i)SELECT .* FROM \"pre_consignment_templates\"").WillReturnError(fmt.Errorf("db error"))
 
 	payload := model.CreatePreConsignmentDTO{PreConsignmentTemplateID: templateID}

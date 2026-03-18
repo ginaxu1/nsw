@@ -7,7 +7,7 @@ The Form Service is a **pure domain service** that provides a simple interface f
 ```
 FormService (Pure Domain Service - No HTTP Endpoints)
   ↓
-GetFormByID(formID uuid.UUID) → Returns JSON Forms Schema
+GetFormByID(formID string) → Returns JSON Forms Schema
 
 TaskManager (Orchestrator)
   ↓

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -16,14 +15,14 @@ type MockAPI struct {
 	mock.Mock
 }
 
-func (m *MockAPI) GetTaskID() uuid.UUID {
+func (m *MockAPI) GetTaskID() string {
 	args := m.Called()
-	return args.Get(0).(uuid.UUID)
+	return args.Get(0).(string)
 }
 
-func (m *MockAPI) GetWorkflowID() uuid.UUID {
+func (m *MockAPI) GetWorkflowID() string {
 	args := m.Called()
-	return args.Get(0).(uuid.UUID)
+	return args.Get(0).(string)
 }
 
 func (m *MockAPI) GetTaskState() State {

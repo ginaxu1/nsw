@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/google/uuid"
-
 	"github.com/OpenNSW/nsw/internal/auth"
 	"github.com/OpenNSW/nsw/internal/workflow/model"
 	"github.com/OpenNSW/nsw/internal/workflow/service"
@@ -128,11 +126,7 @@ func (r *PreConsignmentRouter) HandleGetPreConsignmentByID(w http.ResponseWriter
 		return
 	}
 
-	preConsignmentID, err := uuid.Parse(preConsignmentIDStr)
-	if err != nil {
-		http.Error(w, "invalid pre-consignment ID format: "+err.Error(), http.StatusBadRequest)
-		return
-	}
+	preConsignmentID := preConsignmentIDStr
 
 	preConsignment, err := r.pcs.GetPreConsignmentByID(req.Context(), preConsignmentID)
 	if err != nil {

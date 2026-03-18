@@ -16,9 +16,9 @@ func TestTemplateService_GetWorkflowTemplateByHSCodeIDAndFlow(t *testing.T) {
 	service := NewTemplateService(db)
 	ctx := context.Background()
 
-	hsCodeID := uuid.New()
+	hsCodeID := uuid.NewString()
 	flow := model.ConsignmentFlowImport
-	templateID := uuid.New()
+	templateID := uuid.NewString()
 
 	// Expectation
 	sqlMock.ExpectQuery(`SELECT workflow_templates\.\* FROM "workflow_templates" JOIN workflow_template_maps ON workflow_templates\.id = workflow_template_maps\.workflow_template_id WHERE workflow_template_maps\.hs_code_id = \$1 AND workflow_template_maps\.consignment_flow = \$2 ORDER BY "workflow_templates"."id" LIMIT \$3`).
@@ -37,9 +37,9 @@ func TestTemplateService_GetWorkflowNodeTemplatesByIDs(t *testing.T) {
 	service := NewTemplateService(db)
 	ctx := context.Background()
 
-	id1 := uuid.New()
-	id2 := uuid.New()
-	ids := []uuid.UUID{id1, id2}
+	id1 := uuid.NewString()
+	id2 := uuid.NewString()
+	ids := []string{id1, id2}
 
 	// Expectation
 	sqlMock.ExpectQuery(`SELECT \* FROM "workflow_node_templates" WHERE id IN \(\$1,\$2\)`).
@@ -58,7 +58,7 @@ func TestTemplateService_GetWorkflowTemplateByID(t *testing.T) {
 	service := NewTemplateService(db)
 	ctx := context.Background()
 
-	id := uuid.New()
+	id := uuid.NewString()
 
 	// Expectation
 	sqlMock.ExpectQuery(`SELECT \* FROM "workflow_templates" WHERE id = \$1 ORDER BY "workflow_templates"."id" LIMIT \$2`).
@@ -77,7 +77,7 @@ func TestTemplateService_GetWorkflowNodeTemplateByID(t *testing.T) {
 	service := NewTemplateService(db)
 	ctx := context.Background()
 
-	id := uuid.New()
+	id := uuid.NewString()
 
 	// Expectation
 	sqlMock.ExpectQuery(`SELECT \* FROM "workflow_node_templates" WHERE id = \$1 ORDER BY "workflow_node_templates"."id" LIMIT \$2`).

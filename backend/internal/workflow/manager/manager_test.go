@@ -98,14 +98,14 @@ type MockNodeRepo struct {
 	mock.Mock
 }
 
-func (m *MockNodeRepo) GetWorkflowNodeByIDInTx(ctx context.Context, tx *gorm.DB, nodeID uuid.UUID) (*model.WorkflowNode, error) {
+func (m *MockNodeRepo) GetWorkflowNodeByIDInTx(ctx context.Context, tx *gorm.DB, nodeID string) (*model.WorkflowNode, error) {
 	args := m.Called(ctx, tx, nodeID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*model.WorkflowNode), args.Error(1)
 }
-func (m *MockNodeRepo) GetWorkflowNodesByIDsInTx(ctx context.Context, tx *gorm.DB, nodeIDs []uuid.UUID) ([]model.WorkflowNode, error) {
+func (m *MockNodeRepo) GetWorkflowNodesByIDsInTx(ctx context.Context, tx *gorm.DB, nodeIDs []string) ([]model.WorkflowNode, error) {
 	args := m.Called(ctx, tx, nodeIDs)
 	return args.Get(0).([]model.WorkflowNode), args.Error(1)
 }
@@ -116,15 +116,15 @@ func (m *MockNodeRepo) CreateWorkflowNodesInTx(ctx context.Context, tx *gorm.DB,
 func (m *MockNodeRepo) UpdateWorkflowNodesInTx(ctx context.Context, tx *gorm.DB, nodes []model.WorkflowNode) error {
 	return m.Called(ctx, tx, nodes).Error(0)
 }
-func (m *MockNodeRepo) GetWorkflowNodesByWorkflowIDInTx(ctx context.Context, tx *gorm.DB, workflowID uuid.UUID) ([]model.WorkflowNode, error) {
+func (m *MockNodeRepo) GetWorkflowNodesByWorkflowIDInTx(ctx context.Context, tx *gorm.DB, workflowID string) ([]model.WorkflowNode, error) {
 	args := m.Called(ctx, tx, workflowID)
 	return args.Get(0).([]model.WorkflowNode), args.Error(1)
 }
-func (m *MockNodeRepo) GetWorkflowNodesByWorkflowIDsInTx(ctx context.Context, tx *gorm.DB, workflowIDs []uuid.UUID) ([]model.WorkflowNode, error) {
+func (m *MockNodeRepo) GetWorkflowNodesByWorkflowIDsInTx(ctx context.Context, tx *gorm.DB, workflowIDs []string) ([]model.WorkflowNode, error) {
 	args := m.Called(ctx, tx, workflowIDs)
 	return args.Get(0).([]model.WorkflowNode), args.Error(1)
 }
-func (m *MockNodeRepo) CountIncompleteNodesByWorkflowID(ctx context.Context, tx *gorm.DB, workflowID uuid.UUID) (int64, error) {
+func (m *MockNodeRepo) CountIncompleteNodesByWorkflowID(ctx context.Context, tx *gorm.DB, workflowID string) (int64, error) {
 	args := m.Called(ctx, tx, workflowID)
 	return args.Get(0).(int64), args.Error(1)
 }
@@ -134,11 +134,11 @@ type MockNodeTemplateProvider struct {
 	mock.Mock
 }
 
-func (m *MockNodeTemplateProvider) GetWorkflowNodeTemplatesByIDs(ctx context.Context, ids []uuid.UUID) ([]model.WorkflowNodeTemplate, error) {
+func (m *MockNodeTemplateProvider) GetWorkflowNodeTemplatesByIDs(ctx context.Context, ids []string) ([]model.WorkflowNodeTemplate, error) {
 	args := m.Called(ctx, ids)
 	return args.Get(0).([]model.WorkflowNodeTemplate), args.Error(1)
 }
-func (m *MockNodeTemplateProvider) GetWorkflowNodeTemplateByID(ctx context.Context, id uuid.UUID) (*model.WorkflowNodeTemplate, error) {
+func (m *MockNodeTemplateProvider) GetWorkflowNodeTemplateByID(ctx context.Context, id string) (*model.WorkflowNodeTemplate, error) {
 	args := m.Called(ctx, id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -163,7 +163,7 @@ func TestManager_HandleTaskNotification(t *testing.T) {
 	manager := NewManager(db, mockNodeRepo, mockNTP)
 
 	t.Run("Node Lookup Error", func(t *testing.T) {
-		taskID := uuid.New()
+		taskID := uuid.NewString()
 		pluginState := plugin.Completed
 
 		notification := taskManager.WorkflowManagerNotification{

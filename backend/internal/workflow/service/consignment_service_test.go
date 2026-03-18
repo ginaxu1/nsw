@@ -22,7 +22,7 @@ type MockTemplateProvider struct {
 	mock.Mock
 }
 
-func (m *MockTemplateProvider) GetWorkflowTemplateByHSCodeIDAndFlow(ctx context.Context, hsCodeID uuid.UUID, flow model.ConsignmentFlow) (*model.WorkflowTemplate, error) {
+func (m *MockTemplateProvider) GetWorkflowTemplateByHSCodeIDAndFlow(ctx context.Context, hsCodeID string, flow model.ConsignmentFlow) (*model.WorkflowTemplate, error) {
 	args := m.Called(ctx, hsCodeID, flow)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -30,7 +30,7 @@ func (m *MockTemplateProvider) GetWorkflowTemplateByHSCodeIDAndFlow(ctx context.
 	return args.Get(0).(*model.WorkflowTemplate), args.Error(1)
 }
 
-func (m *MockTemplateProvider) GetWorkflowTemplateByID(ctx context.Context, id uuid.UUID) (*model.WorkflowTemplate, error) {
+func (m *MockTemplateProvider) GetWorkflowTemplateByID(ctx context.Context, id string) (*model.WorkflowTemplate, error) {
 	args := m.Called(ctx, id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -38,7 +38,7 @@ func (m *MockTemplateProvider) GetWorkflowTemplateByID(ctx context.Context, id u
 	return args.Get(0).(*model.WorkflowTemplate), args.Error(1)
 }
 
-func (m *MockTemplateProvider) GetWorkflowNodeTemplatesByIDs(ctx context.Context, ids []uuid.UUID) ([]model.WorkflowNodeTemplate, error) {
+func (m *MockTemplateProvider) GetWorkflowNodeTemplatesByIDs(ctx context.Context, ids []string) ([]model.WorkflowNodeTemplate, error) {
 	args := m.Called(ctx, ids)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -46,7 +46,7 @@ func (m *MockTemplateProvider) GetWorkflowNodeTemplatesByIDs(ctx context.Context
 	return args.Get(0).([]model.WorkflowNodeTemplate), args.Error(1)
 }
 
-func (m *MockTemplateProvider) GetWorkflowNodeTemplateByID(ctx context.Context, id uuid.UUID) (*model.WorkflowNodeTemplate, error) {
+func (m *MockTemplateProvider) GetWorkflowNodeTemplateByID(ctx context.Context, id string) (*model.WorkflowNodeTemplate, error) {
 	args := m.Called(ctx, id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -67,12 +67,12 @@ type MockWorkflowManager struct {
 	mock.Mock
 }
 
-func (m *MockWorkflowManager) StartWorkflowInstance(ctx context.Context, tx *gorm.DB, workflowID uuid.UUID, workflowTemplates []model.WorkflowTemplate, globalContext map[string]any, handler workflowmanager.WorkflowEventHandler) error {
+func (m *MockWorkflowManager) StartWorkflowInstance(ctx context.Context, tx *gorm.DB, workflowID string, workflowTemplates []model.WorkflowTemplate, globalContext map[string]any, handler workflowmanager.WorkflowEventHandler) error {
 	args := m.Called(ctx, tx, workflowID, workflowTemplates, globalContext, handler)
 	return args.Error(0)
 }
 
-func (m *MockWorkflowManager) GetWorkflowInstance(ctx context.Context, workflowID uuid.UUID) (*model.Workflow, error) {
+func (m *MockWorkflowManager) GetWorkflowInstance(ctx context.Context, workflowID string) (*model.Workflow, error) {
 	args := m.Called(ctx, workflowID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -96,7 +96,7 @@ func TestConsignmentService_InitializeConsignment(t *testing.T) {
 
 	ctx := context.Background()
 	traderID := "trader1"
-	hsCodeID := uuid.New()
+	hsCodeID := uuid.NewString()
 	createReq := &model.CreateConsignmentDTO{
 		Flow: model.ConsignmentFlowImport,
 		Items: []model.CreateConsignmentItemDTO{
@@ -106,9 +106,9 @@ func TestConsignmentService_InitializeConsignment(t *testing.T) {
 	globalContext := map[string]any{"key": "value"}
 
 	workflowTemplate := &model.WorkflowTemplate{
-		BaseModel:     model.BaseModel{ID: uuid.New()},
+		BaseModel:     model.BaseModel{ID: uuid.NewString()},
 		Name:          "Test Template",
-		NodeTemplates: model.UUIDArray{uuid.New()},
+		NodeTemplates: model.StringArray{uuid.NewString()},
 	}
 	mockTP.On("GetWorkflowTemplateByHSCodeIDAndFlow", ctx, hsCodeID, model.ConsignmentFlowImport).Return(workflowTemplate, nil)
 
@@ -116,16 +116,16 @@ func TestConsignmentService_InitializeConsignment(t *testing.T) {
 	sqlMock.ExpectExec(`INSERT INTO "consignments"`).
 		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(1, 1))
-	mockWM.On("StartWorkflowInstance", ctx, mock.Anything, mock.AnythingOfType("uuid.UUID"), mock.Anything, globalContext, mock.Anything).Return(nil)
+	mockWM.On("StartWorkflowInstance", ctx, mock.Anything, mock.AnythingOfType("string"), mock.Anything, globalContext, mock.Anything).Return(nil)
 	sqlMock.ExpectCommit()
 
 	nodeTemplateID := workflowTemplate.NodeTemplates[0]
-	mockWM.On("GetWorkflowInstance", ctx, mock.AnythingOfType("uuid.UUID")).Return(&model.Workflow{
-		BaseModel: model.BaseModel{ID: uuid.New()},
+	mockWM.On("GetWorkflowInstance", ctx, mock.AnythingOfType("string")).Return(&model.Workflow{
+		BaseModel: model.BaseModel{ID: uuid.NewString()},
 		Status:    model.WorkflowStatusInProgress,
 		WorkflowNodes: []model.WorkflowNode{
 			{
-				BaseModel:              model.BaseModel{ID: uuid.New()},
+				BaseModel:              model.BaseModel{ID: uuid.NewString()},
 				WorkflowNodeTemplateID: nodeTemplateID,
 				State:                  model.WorkflowNodeStateReady,
 				WorkflowNodeTemplate: model.WorkflowNodeTemplate{
@@ -140,7 +140,7 @@ func TestConsignmentService_InitializeConsignment(t *testing.T) {
 	sqlMock.ExpectQuery(`SELECT \* FROM "consignments"`).
 		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "flow", "trader_id", "state", "created_at", "updated_at", "items"}).
-			AddRow(uuid.New(), "IMPORT", traderID, "IN_PROGRESS", time.Now(), time.Now(), []byte(`[{"hsCodeId":"`+hsCodeID.String()+`"}]`)))
+			AddRow(uuid.NewString(), "IMPORT", traderID, "IN_PROGRESS", time.Now(), time.Now(), []byte(`[{"hsCodeId":"`+hsCodeID+`"}]`)))
 
 	sqlMock.ExpectQuery(`SELECT \* FROM "hs_codes" WHERE id IN`).
 		WithArgs(hsCodeID).
@@ -161,7 +161,7 @@ func TestConsignmentService_InitializeConsignment_TemplateNotFound(t *testing.T)
 	svc := NewConsignmentService(db, mockTP, mockWM)
 
 	ctx := context.Background()
-	hsCodeID := uuid.New()
+	hsCodeID := uuid.NewString()
 	createReq := &model.CreateConsignmentDTO{
 		Flow: model.ConsignmentFlowImport,
 		Items: []model.CreateConsignmentItemDTO{
@@ -183,21 +183,21 @@ func TestConsignmentService_GetConsignmentByID(t *testing.T) {
 	svc := NewConsignmentService(db, nil, mockWM)
 
 	ctx := context.Background()
-	consignmentID := uuid.New()
-	hsCodeID := uuid.New()
-	nodeTemplateID := uuid.New()
+	consignmentID := uuid.NewString()
+	hsCodeID := uuid.NewString()
+	nodeTemplateID := uuid.NewString()
 
 	sqlMock.ExpectQuery(`SELECT \* FROM "consignments" WHERE id = \$1 ORDER BY "consignments"."id" LIMIT \$2`).
 		WithArgs(consignmentID, 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "flow", "trader_id", "state", "created_at", "updated_at", "items"}).
-			AddRow(consignmentID, "IMPORT", "trader1", "IN_PROGRESS", time.Now(), time.Now(), []byte(`[{"hsCodeId":"`+hsCodeID.String()+`"}]`)))
+			AddRow(consignmentID, "IMPORT", "trader1", "IN_PROGRESS", time.Now(), time.Now(), []byte(`[{"hsCodeId":"`+hsCodeID+`"}]`)))
 
 	mockWM.On("GetWorkflowInstance", ctx, consignmentID).Return(&model.Workflow{
 		BaseModel: model.BaseModel{ID: consignmentID},
 		Status:    model.WorkflowStatusInProgress,
 		WorkflowNodes: []model.WorkflowNode{
 			{
-				BaseModel:              model.BaseModel{ID: uuid.New()},
+				BaseModel:              model.BaseModel{ID: uuid.NewString()},
 				WorkflowNodeTemplateID: nodeTemplateID,
 				State:                  model.WorkflowNodeStateReady,
 				WorkflowNodeTemplate: model.WorkflowNodeTemplate{
@@ -229,9 +229,9 @@ func TestConsignmentService_UpdateConsignment(t *testing.T) {
 	svc := NewConsignmentService(db, nil, mockWM)
 
 	ctx := context.Background()
-	consignmentID := uuid.New()
-	hsCodeID := uuid.New()
-	nodeTemplateID := uuid.New()
+	consignmentID := uuid.NewString()
+	hsCodeID := uuid.NewString()
+	nodeTemplateID := uuid.NewString()
 
 	state := model.ConsignmentStateFinished
 	updateReq := &model.UpdateConsignmentDTO{
@@ -251,14 +251,14 @@ func TestConsignmentService_UpdateConsignment(t *testing.T) {
 	sqlMock.ExpectQuery(`SELECT \* FROM "consignments" WHERE id = \$1`).
 		WithArgs(consignmentID, consignmentID, 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "flow", "trader_id", "state", "created_at", "updated_at", "items"}).
-			AddRow(consignmentID, "IMPORT", "trader1", "FINISHED", time.Now(), time.Now(), []byte(`[{"hsCodeId":"`+hsCodeID.String()+`"}]`)))
+			AddRow(consignmentID, "IMPORT", "trader1", "FINISHED", time.Now(), time.Now(), []byte(`[{"hsCodeId":"`+hsCodeID+`"}]`)))
 
 	mockWM.On("GetWorkflowInstance", ctx, consignmentID).Return(&model.Workflow{
 		BaseModel: model.BaseModel{ID: consignmentID},
 		Status:    model.WorkflowStatusInProgress,
 		WorkflowNodes: []model.WorkflowNode{
 			{
-				BaseModel:              model.BaseModel{ID: uuid.New()},
+				BaseModel:              model.BaseModel{ID: uuid.NewString()},
 				WorkflowNodeTemplateID: nodeTemplateID,
 				State:                  model.WorkflowNodeStateCompleted,
 				WorkflowNodeTemplate: model.WorkflowNodeTemplate{
@@ -286,7 +286,7 @@ func TestConsignmentService_UpdateConsignment_NotFound(t *testing.T) {
 	db, sqlMock := setupTestDB(t)
 	svc := NewConsignmentService(db, nil, nil)
 	ctx := context.Background()
-	consignmentID := uuid.New()
+	consignmentID := uuid.NewString()
 	state := model.ConsignmentStateFinished
 	updateReq := &model.UpdateConsignmentDTO{
 		ConsignmentID: consignmentID,

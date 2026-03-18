@@ -19,7 +19,7 @@ type MockWorkflowNodeRepository struct {
 	mock.Mock
 }
 
-func (m *MockWorkflowNodeRepository) GetWorkflowNodeByIDInTx(ctx context.Context, tx *gorm.DB, nodeID uuid.UUID) (*model.WorkflowNode, error) {
+func (m *MockWorkflowNodeRepository) GetWorkflowNodeByIDInTx(ctx context.Context, tx *gorm.DB, nodeID string) (*model.WorkflowNode, error) {
 	args := m.Called(ctx, tx, nodeID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -27,7 +27,7 @@ func (m *MockWorkflowNodeRepository) GetWorkflowNodeByIDInTx(ctx context.Context
 	return args.Get(0).(*model.WorkflowNode), args.Error(1)
 }
 
-func (m *MockWorkflowNodeRepository) GetWorkflowNodesByIDsInTx(ctx context.Context, tx *gorm.DB, nodeIDs []uuid.UUID) ([]model.WorkflowNode, error) {
+func (m *MockWorkflowNodeRepository) GetWorkflowNodesByIDsInTx(ctx context.Context, tx *gorm.DB, nodeIDs []string) ([]model.WorkflowNode, error) {
 	args := m.Called(ctx, tx, nodeIDs)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -47,7 +47,7 @@ func (m *MockWorkflowNodeRepository) UpdateWorkflowNodesInTx(ctx context.Context
 	return args.Error(0)
 }
 
-func (m *MockWorkflowNodeRepository) GetWorkflowNodesByWorkflowIDInTx(ctx context.Context, tx *gorm.DB, workflowID uuid.UUID) ([]model.WorkflowNode, error) {
+func (m *MockWorkflowNodeRepository) GetWorkflowNodesByWorkflowIDInTx(ctx context.Context, tx *gorm.DB, workflowID string) ([]model.WorkflowNode, error) {
 	args := m.Called(ctx, tx, workflowID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -55,7 +55,7 @@ func (m *MockWorkflowNodeRepository) GetWorkflowNodesByWorkflowIDInTx(ctx contex
 	return args.Get(0).([]model.WorkflowNode), args.Error(1)
 }
 
-func (m *MockWorkflowNodeRepository) GetWorkflowNodesByWorkflowIDsInTx(ctx context.Context, tx *gorm.DB, workflowIDs []uuid.UUID) ([]model.WorkflowNode, error) {
+func (m *MockWorkflowNodeRepository) GetWorkflowNodesByWorkflowIDsInTx(ctx context.Context, tx *gorm.DB, workflowIDs []string) ([]model.WorkflowNode, error) {
 	args := m.Called(ctx, tx, workflowIDs)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -63,7 +63,7 @@ func (m *MockWorkflowNodeRepository) GetWorkflowNodesByWorkflowIDsInTx(ctx conte
 	return args.Get(0).([]model.WorkflowNode), args.Error(1)
 }
 
-func (m *MockWorkflowNodeRepository) CountIncompleteNodesByWorkflowID(ctx context.Context, tx *gorm.DB, workflowID uuid.UUID) (int64, error) {
+func (m *MockWorkflowNodeRepository) CountIncompleteNodesByWorkflowID(ctx context.Context, tx *gorm.DB, workflowID string) (int64, error) {
 	args := m.Called(ctx, tx, workflowID)
 	return args.Get(0).(int64), args.Error(1)
 }
@@ -75,7 +75,7 @@ func TestTransitionToCompleted(t *testing.T) {
 
 	t.Run("Already Completed", func(t *testing.T) {
 		node := &model.WorkflowNode{
-			BaseModel: model.BaseModel{ID: uuid.New()},
+			BaseModel: model.BaseModel{ID: uuid.NewString()},
 			State:     model.WorkflowNodeStateCompleted,
 		}
 		result, err := sm.TransitionToCompleted(ctx, nil, node, nil)
@@ -87,7 +87,7 @@ func TestTransitionToCompleted(t *testing.T) {
 
 	t.Run("Invalid State Transition", func(t *testing.T) {
 		node := &model.WorkflowNode{
-			BaseModel: model.BaseModel{ID: uuid.New()},
+			BaseModel: model.BaseModel{ID: uuid.NewString()},
 			State:     model.WorkflowNodeStateLocked,
 		}
 		_, err := sm.TransitionToCompleted(ctx, nil, node, nil)
@@ -96,8 +96,8 @@ func TestTransitionToCompleted(t *testing.T) {
 	})
 
 	t.Run("Successful Transition No Dependencies", func(t *testing.T) {
-		nodeID := uuid.New()
-		workflowID := uuid.New()
+		nodeID := uuid.NewString()
+		workflowID := uuid.NewString()
 		node := &model.WorkflowNode{
 			BaseModel:  model.BaseModel{ID: nodeID},
 			WorkflowID: workflowID,
@@ -119,9 +119,9 @@ func TestTransitionToCompleted(t *testing.T) {
 	})
 
 	t.Run("Unlock Dependent Nodes", func(t *testing.T) {
-		nodeID := uuid.New()
-		dependentNodeID := uuid.New()
-		workflowID := uuid.New()
+		nodeID := uuid.NewString()
+		dependentNodeID := uuid.NewString()
+		workflowID := uuid.NewString()
 
 		node := &model.WorkflowNode{
 			BaseModel:  model.BaseModel{ID: nodeID},
@@ -133,7 +133,7 @@ func TestTransitionToCompleted(t *testing.T) {
 			BaseModel:  model.BaseModel{ID: dependentNodeID},
 			WorkflowID: workflowID,
 			State:      model.WorkflowNodeStateLocked,
-			DependsOn:  model.UUIDArray{nodeID},
+			DependsOn:  model.StringArray{nodeID},
 		}
 
 		mockRepo.On("GetWorkflowNodesByWorkflowIDInTx", ctx, (*gorm.DB)(nil), workflowID).Return([]model.WorkflowNode{*node, *dependentNode}, nil).Once()
@@ -156,8 +156,8 @@ func TestInitializeNodesFromTemplates(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("Create Nodes With Dependencies", func(t *testing.T) {
-		template1ID := uuid.New()
-		template2ID := uuid.New()
+		template1ID := uuid.NewString()
+		template2ID := uuid.NewString()
 
 		templates := []model.WorkflowNodeTemplate{
 			{
@@ -165,23 +165,23 @@ func TestInitializeNodesFromTemplates(t *testing.T) {
 			},
 			{
 				BaseModel: model.BaseModel{ID: template2ID},
-				DependsOn: model.UUIDArray{template1ID},
+				DependsOn: model.StringArray{template1ID},
 			},
 		}
 
-		workflowID := uuid.New()
+		workflowID := uuid.NewString()
 
 		// Mock CreateWorkflowNodesInTx
 		mockRepo.On("CreateWorkflowNodesInTx", ctx, (*gorm.DB)(nil), mock.MatchedBy(func(nodes []model.WorkflowNode) bool {
 			return len(nodes) == 2
 		})).Return([]model.WorkflowNode{
 			{
-				BaseModel:              model.BaseModel{ID: uuid.New()},
+				BaseModel:              model.BaseModel{ID: uuid.NewString()},
 				WorkflowNodeTemplateID: template1ID,
 				State:                  model.WorkflowNodeStateLocked,
 			},
 			{
-				BaseModel:              model.BaseModel{ID: uuid.New()},
+				BaseModel:              model.BaseModel{ID: uuid.NewString()},
 				WorkflowNodeTemplateID: template2ID,
 				State:                  model.WorkflowNodeStateLocked,
 			},
@@ -214,17 +214,17 @@ func TestInitializeNodesFromTemplates(t *testing.T) {
 	})
 
 	t.Run("Create Nodes Without Dependencies", func(t *testing.T) {
-		templateID := uuid.New()
+		templateID := uuid.NewString()
 		templates := []model.WorkflowNodeTemplate{
 			{BaseModel: model.BaseModel{ID: templateID}},
 		}
-		workflowID := uuid.New()
+		workflowID := uuid.NewString()
 
 		mockRepo.On("CreateWorkflowNodesInTx", ctx, (*gorm.DB)(nil), mock.MatchedBy(func(nodes []model.WorkflowNode) bool {
 			return len(nodes) == 1
 		})).Return([]model.WorkflowNode{
 			{
-				BaseModel:              model.BaseModel{ID: uuid.New()},
+				BaseModel:              model.BaseModel{ID: uuid.NewString()},
 				WorkflowNodeTemplateID: templateID,
 				State:                  model.WorkflowNodeStateLocked,
 			},
@@ -247,7 +247,7 @@ func TestTransitionToFailed(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		node := &model.WorkflowNode{
-			BaseModel: model.BaseModel{ID: uuid.New()},
+			BaseModel: model.BaseModel{ID: uuid.NewString()},
 			State:     model.WorkflowNodeStateInProgress,
 		}
 		updateReq := &model.UpdateWorkflowNodeDTO{}
@@ -263,7 +263,7 @@ func TestTransitionToFailed(t *testing.T) {
 
 	t.Run("Already Failed", func(t *testing.T) {
 		node := &model.WorkflowNode{
-			BaseModel: model.BaseModel{ID: uuid.New()},
+			BaseModel: model.BaseModel{ID: uuid.NewString()},
 			State:     model.WorkflowNodeStateFailed,
 		}
 
@@ -274,7 +274,7 @@ func TestTransitionToFailed(t *testing.T) {
 
 	t.Run("Invalid Transition", func(t *testing.T) {
 		node := &model.WorkflowNode{
-			BaseModel: model.BaseModel{ID: uuid.New()},
+			BaseModel: model.BaseModel{ID: uuid.NewString()},
 			State:     model.WorkflowNodeStateLocked,
 		}
 
@@ -290,7 +290,7 @@ func TestTransitionToInProgress(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		node := &model.WorkflowNode{
-			BaseModel: model.BaseModel{ID: uuid.New()},
+			BaseModel: model.BaseModel{ID: uuid.NewString()},
 			State:     model.WorkflowNodeStateReady,
 		}
 		updateReq := &model.UpdateWorkflowNodeDTO{}
@@ -306,7 +306,7 @@ func TestTransitionToInProgress(t *testing.T) {
 
 	t.Run("Already InProgress", func(t *testing.T) {
 		node := &model.WorkflowNode{
-			BaseModel: model.BaseModel{ID: uuid.New()},
+			BaseModel: model.BaseModel{ID: uuid.NewString()},
 			State:     model.WorkflowNodeStateInProgress,
 		}
 
@@ -317,7 +317,7 @@ func TestTransitionToInProgress(t *testing.T) {
 
 	t.Run("Invalid Transition", func(t *testing.T) {
 		node := &model.WorkflowNode{
-			BaseModel: model.BaseModel{ID: uuid.New()},
+			BaseModel: model.BaseModel{ID: uuid.NewString()},
 			State:     model.WorkflowNodeStateLocked,
 		}
 
@@ -332,8 +332,8 @@ func TestTransitionToCompletedWithOutcome(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("Outcome Set On Completion", func(t *testing.T) {
-		nodeID := uuid.New()
-		workflowID := uuid.New()
+		nodeID := uuid.NewString()
+		workflowID := uuid.NewString()
 		node := &model.WorkflowNode{
 			BaseModel:  model.BaseModel{ID: nodeID},
 			WorkflowID: workflowID,
@@ -364,9 +364,9 @@ func TestUnlockWithUnlockConfiguration(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("Condition Met - Unlock Dependent", func(t *testing.T) {
-		nodeAID := uuid.New()
-		nodeBID := uuid.New()
-		workflowID := uuid.New()
+		nodeAID := uuid.NewString()
+		nodeBID := uuid.NewString()
+		workflowID := uuid.NewString()
 
 		nodeA := &model.WorkflowNode{
 			BaseModel:  model.BaseModel{ID: nodeAID},
@@ -379,7 +379,7 @@ func TestUnlockWithUnlockConfiguration(t *testing.T) {
 			BaseModel:  model.BaseModel{ID: nodeBID},
 			WorkflowID: workflowID,
 			State:      model.WorkflowNodeStateLocked,
-			DependsOn:  model.UUIDArray{nodeAID},
+			DependsOn:  model.StringArray{nodeAID},
 			UnlockConfiguration: &model.UnlockConfig{
 				AnyOf: []model.UnlockGroup{
 					{
@@ -408,9 +408,9 @@ func TestUnlockWithUnlockConfiguration(t *testing.T) {
 	})
 
 	t.Run("Condition Not Met - Wrong Outcome", func(t *testing.T) {
-		nodeAID := uuid.New()
-		nodeBID := uuid.New()
-		workflowID := uuid.New()
+		nodeAID := uuid.NewString()
+		nodeBID := uuid.NewString()
+		workflowID := uuid.NewString()
 
 		nodeA := &model.WorkflowNode{
 			BaseModel:  model.BaseModel{ID: nodeAID},
@@ -422,7 +422,7 @@ func TestUnlockWithUnlockConfiguration(t *testing.T) {
 			BaseModel:  model.BaseModel{ID: nodeBID},
 			WorkflowID: workflowID,
 			State:      model.WorkflowNodeStateLocked,
-			DependsOn:  model.UUIDArray{nodeAID},
+			DependsOn:  model.StringArray{nodeAID},
 			UnlockConfiguration: &model.UnlockConfig{
 				AnyOf: []model.UnlockGroup{
 					{
@@ -451,9 +451,9 @@ func TestUnlockWithUnlockConfiguration(t *testing.T) {
 	})
 
 	t.Run("OR Condition - Second Group Met", func(t *testing.T) {
-		nodeAID := uuid.New()
-		nodeBID := uuid.New()
-		workflowID := uuid.New()
+		nodeAID := uuid.NewString()
+		nodeBID := uuid.NewString()
+		workflowID := uuid.NewString()
 
 		nodeA := &model.WorkflowNode{
 			BaseModel:  model.BaseModel{ID: nodeAID},
@@ -466,7 +466,7 @@ func TestUnlockWithUnlockConfiguration(t *testing.T) {
 			BaseModel:  model.BaseModel{ID: nodeBID},
 			WorkflowID: workflowID,
 			State:      model.WorkflowNodeStateLocked,
-			DependsOn:  model.UUIDArray{nodeAID},
+			DependsOn:  model.StringArray{nodeAID},
 			UnlockConfiguration: &model.UnlockConfig{
 				AnyOf: []model.UnlockGroup{
 					{
@@ -500,9 +500,9 @@ func TestUnlockWithUnlockConfiguration(t *testing.T) {
 	})
 
 	t.Run("State Only Condition - No Outcome Required", func(t *testing.T) {
-		nodeAID := uuid.New()
-		nodeBID := uuid.New()
-		workflowID := uuid.New()
+		nodeAID := uuid.NewString()
+		nodeBID := uuid.NewString()
+		workflowID := uuid.NewString()
 
 		nodeA := &model.WorkflowNode{
 			BaseModel:  model.BaseModel{ID: nodeAID},
@@ -515,7 +515,7 @@ func TestUnlockWithUnlockConfiguration(t *testing.T) {
 			BaseModel:  model.BaseModel{ID: nodeBID},
 			WorkflowID: workflowID,
 			State:      model.WorkflowNodeStateLocked,
-			DependsOn:  model.UUIDArray{nodeAID},
+			DependsOn:  model.StringArray{nodeAID},
 			UnlockConfiguration: &model.UnlockConfig{
 				AnyOf: []model.UnlockGroup{
 					{
@@ -547,17 +547,17 @@ func TestEndNodeWorkflowCompletion(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("End Node Completed - Workflow Done", func(t *testing.T) {
-		endNodeID := uuid.New()
-		otherTemplateID := uuid.New()
+		endNodeID := uuid.NewString()
+		otherTemplateID := uuid.NewString()
 		nodeAID := endNodeID
-		nodeBID := uuid.New()
-		workflowID := uuid.New()
+		nodeBID := uuid.NewString()
+		workflowID := uuid.NewString()
 
 		// Node A is the end node and is being completed
 		nodeA := &model.WorkflowNode{
 			BaseModel:              model.BaseModel{ID: nodeAID},
 			WorkflowID:             workflowID,
-			WorkflowNodeTemplateID: uuid.New(),
+			WorkflowNodeTemplateID: uuid.NewString(),
 			State:                  model.WorkflowNodeStateInProgress,
 		}
 
@@ -567,7 +567,7 @@ func TestEndNodeWorkflowCompletion(t *testing.T) {
 			WorkflowID:             workflowID,
 			WorkflowNodeTemplateID: otherTemplateID,
 			State:                  model.WorkflowNodeStateLocked,
-			DependsOn:              model.UUIDArray{},
+			DependsOn:              model.StringArray{},
 		}
 
 		updateReq := &model.UpdateWorkflowNodeDTO{}
@@ -585,11 +585,11 @@ func TestEndNodeWorkflowCompletion(t *testing.T) {
 	})
 
 	t.Run("Non-End Node Completed - Workflow Not Done", func(t *testing.T) {
-		endNodeID := uuid.New()
-		otherTemplateID := uuid.New()
-		nodeAID := uuid.New()
+		endNodeID := uuid.NewString()
+		otherTemplateID := uuid.NewString()
+		nodeAID := uuid.NewString()
 		nodeBID := endNodeID
-		workflowID := uuid.New()
+		workflowID := uuid.NewString()
 
 		// Node A is NOT the end node, is being completed
 		nodeA := &model.WorkflowNode{
@@ -603,9 +603,9 @@ func TestEndNodeWorkflowCompletion(t *testing.T) {
 		nodeB := model.WorkflowNode{
 			BaseModel:              model.BaseModel{ID: nodeBID},
 			WorkflowID:             workflowID,
-			WorkflowNodeTemplateID: uuid.New(),
+			WorkflowNodeTemplateID: uuid.NewString(),
 			State:                  model.WorkflowNodeStateLocked,
-			DependsOn:              model.UUIDArray{uuid.New()},
+			DependsOn:              model.StringArray{uuid.NewString()},
 		}
 
 		updateReq := &model.UpdateWorkflowNodeDTO{}
@@ -623,24 +623,24 @@ func TestEndNodeWorkflowCompletion(t *testing.T) {
 	})
 
 	t.Run("End Node Unlocks And Auto-Completes", func(t *testing.T) {
-		endNodeID := uuid.New()
-		nodeAID := uuid.New()
-		workflowID := uuid.New()
+		endNodeID := uuid.NewString()
+		nodeAID := uuid.NewString()
+		workflowID := uuid.NewString()
 
 		// Node A is completed, end node depends on it.
 		nodeA := &model.WorkflowNode{
 			BaseModel:              model.BaseModel{ID: nodeAID},
 			WorkflowID:             workflowID,
-			WorkflowNodeTemplateID: uuid.New(),
+			WorkflowNodeTemplateID: uuid.NewString(),
 			State:                  model.WorkflowNodeStateInProgress,
 		}
 
 		endNode := model.WorkflowNode{
 			BaseModel:              model.BaseModel{ID: endNodeID},
 			WorkflowID:             workflowID,
-			WorkflowNodeTemplateID: uuid.New(),
+			WorkflowNodeTemplateID: uuid.NewString(),
 			State:                  model.WorkflowNodeStateLocked,
-			DependsOn:              model.UUIDArray{nodeAID},
+			DependsOn:              model.StringArray{nodeAID},
 		}
 
 		updateReq := &model.UpdateWorkflowNodeDTO{}
@@ -674,9 +674,9 @@ func TestEndNodeWorkflowCompletion(t *testing.T) {
 	})
 
 	t.Run("No EndNodeID - Falls Back To All Nodes", func(t *testing.T) {
-		nodeAID := uuid.New()
-		nodeBID := uuid.New()
-		workflowID := uuid.New()
+		nodeAID := uuid.NewString()
+		nodeBID := uuid.NewString()
+		workflowID := uuid.NewString()
 
 		nodeA := &model.WorkflowNode{
 			BaseModel:  model.BaseModel{ID: nodeAID},
@@ -688,7 +688,7 @@ func TestEndNodeWorkflowCompletion(t *testing.T) {
 			BaseModel:  model.BaseModel{ID: nodeBID},
 			WorkflowID: workflowID,
 			State:      model.WorkflowNodeStateLocked,
-			DependsOn:  model.UUIDArray{nodeAID},
+			DependsOn:  model.StringArray{nodeAID},
 		}
 
 		updateReq := &model.UpdateWorkflowNodeDTO{}
@@ -703,8 +703,8 @@ func TestEndNodeWorkflowCompletion(t *testing.T) {
 	})
 
 	t.Run("Nil EndNodeID In Config - Falls Back To All Nodes", func(t *testing.T) {
-		nodeAID := uuid.New()
-		workflowID := uuid.New()
+		nodeAID := uuid.NewString()
+		workflowID := uuid.NewString()
 
 		nodeA := &model.WorkflowNode{
 			BaseModel:  model.BaseModel{ID: nodeAID},
@@ -733,8 +733,8 @@ func TestInitializeNodesWithUnlockConfiguration(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("Resolve UnlockConfiguration From Template To Instance IDs", func(t *testing.T) {
-		template1ID := uuid.New()
-		template2ID := uuid.New()
+		template1ID := uuid.NewString()
+		template2ID := uuid.NewString()
 
 		templates := []model.WorkflowNodeTemplate{
 			{
@@ -742,7 +742,7 @@ func TestInitializeNodesWithUnlockConfiguration(t *testing.T) {
 			},
 			{
 				BaseModel: model.BaseModel{ID: template2ID},
-				DependsOn: model.UUIDArray{template1ID},
+				DependsOn: model.StringArray{template1ID},
 				UnlockConfiguration: &model.UnlockConfig{
 					AnyOf: []model.UnlockGroup{
 						{
@@ -755,10 +755,10 @@ func TestInitializeNodesWithUnlockConfiguration(t *testing.T) {
 			},
 		}
 
-		workflowID := uuid.New()
+		workflowID := uuid.NewString()
 
-		node1ID := uuid.New()
-		node2ID := uuid.New()
+		node1ID := uuid.NewString()
+		node2ID := uuid.NewString()
 
 		mockRepo.On("CreateWorkflowNodesInTx", ctx, (*gorm.DB)(nil), mock.MatchedBy(func(nodes []model.WorkflowNode) bool {
 			return len(nodes) == 2

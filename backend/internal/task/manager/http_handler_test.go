@@ -2,6 +2,7 @@ package manager
 
 import (
 	"bytes"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -50,15 +51,17 @@ func TestHTTPHandler_HandleGetTask(t *testing.T) {
 	})
 
 	t.Run("Invalid TaskID string", func(t *testing.T) {
-		tm, _, _, _ := setupTest(t)
+		tm, _, mockStore, _ := setupTest(t)
 		handler := NewHTTPHandler(tm)
 		req := httptest.NewRequest(http.MethodGet, "/tasks/invalid", nil)
 		req.SetPathValue("id", "invalid")
 		w := httptest.NewRecorder()
 
+		mockStore.On("GetByID", "invalid").Return(nil, errors.New("not found")).Once()
+
 		handler.HandleGetTask(w, req)
 
 		resp := w.Result()
-		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	})
 }

@@ -5,8 +5,6 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/google/uuid"
-
 	"github.com/OpenNSW/nsw/internal/auth"
 	"github.com/OpenNSW/nsw/internal/workflow/model"
 	"github.com/OpenNSW/nsw/internal/workflow/service"
@@ -117,12 +115,7 @@ func (c *ConsignmentRouter) HandleGetConsignments(w http.ResponseWriter, r *http
 	case "cha":
 		// Check if UI sent a specific ID to filter by
 		if chaIDStr := r.URL.Query().Get("cha_id"); chaIDStr != "" {
-			chaID, err := uuid.Parse(chaIDStr)
-			if err != nil {
-				http.Error(w, "invalid cha_id format", http.StatusBadRequest)
-				return
-			}
-			filter.ChaID = &chaID
+			filter.ChaID = &chaIDStr
 		} else {
 			// Fallback: Default to the user's own profile if no specific ID requested
 			cha, err := c.cha.GetCHAByEmail(ctx, authCtx.UserID)
@@ -163,11 +156,7 @@ func (c *ConsignmentRouter) HandleInitializeConsignment(w http.ResponseWriter, r
 		http.Error(w, "consignment ID is required", http.StatusBadRequest)
 		return
 	}
-	consignmentID, err := uuid.Parse(consignmentIDStr)
-	if err != nil {
-		http.Error(w, "invalid consignment ID format", http.StatusBadRequest)
-		return
-	}
+	consignmentID := consignmentIDStr
 	// TODO: Need to Call GetConsignmentByID and check whether the Consignment.ChaID and authContext.UserID are equal
 	// Otherwise Forbidden
 	var req model.InitializeConsignmentDTO
@@ -213,11 +202,7 @@ func (c *ConsignmentRouter) HandleGetConsignmentByID(w http.ResponseWriter, r *h
 	}
 
 	// Parse UUID
-	consignmentID, err := uuid.Parse(consignmentIDStr)
-	if err != nil {
-		http.Error(w, "invalid consignment ID format: "+err.Error(), http.StatusBadRequest)
-		return
-	}
+	consignmentID := consignmentIDStr
 
 	// Get consignment from service
 	consignment, err := c.cs.GetConsignmentByID(r.Context(), consignmentID)

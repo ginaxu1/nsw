@@ -149,8 +149,12 @@ func TestUpload_Unauthorized(t *testing.T) {
 	var buf bytes.Buffer
 	w := multipart.NewWriter(&buf)
 	part, _ := w.CreateFormFile("file", "test.pdf")
-	part.Write([]byte("content"))
-	w.Close()
+	if _, err := part.Write([]byte("content")); err != nil {
+		t.Fatalf("failed to write multipart content: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("failed to close multipart writer: %v", err)
+	}
 
 	req := httptest.NewRequest(http.MethodPost, "/uploads", &buf)
 	req.Header.Set("Content-Type", w.FormDataContentType())

@@ -11,7 +11,7 @@
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS task_infos
 (
-	id uuid DEFAULT gen_random_uuid() NOT NULL
+	id text NOT NULL
 		PRIMARY KEY,
 	type varchar(50) NOT NULL
 		CONSTRAINT task_infos_type_check
@@ -25,8 +25,8 @@ CREATE TABLE IF NOT EXISTS task_infos
 	global_context jsonb,
 	created_at timestamp with time zone DEFAULT now() NOT NULL,
 	updated_at timestamp with time zone DEFAULT now() NOT NULL,
-	workflow_id uuid NOT NULL,
-	workflow_node_template_id uuid
+	workflow_id text NOT NULL,
+	workflow_node_template_id text
 );
 
 COMMENT ON TABLE task_infos IS 'Task executable information and state management for the ExecutionUnit Manager';
@@ -69,7 +69,7 @@ CREATE INDEX IF NOT EXISTS idx_task_infos_workflow_node_template_id
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS forms
 (
-	id uuid DEFAULT gen_random_uuid() NOT NULL
+	id text NOT NULL
 		PRIMARY KEY,
 	name varchar(255) NOT NULL,
 	description text,
@@ -94,7 +94,7 @@ CREATE INDEX IF NOT EXISTS idx_forms_active
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS hs_codes
 (
-	id uuid DEFAULT gen_random_uuid() NOT NULL
+	id text NOT NULL
 		PRIMARY KEY,
 	hs_code varchar(50) NOT NULL
 		UNIQUE,
@@ -114,7 +114,7 @@ CREATE INDEX IF NOT EXISTS idx_hs_codes_hs_code
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS workflow_node_templates
 (
-	id uuid DEFAULT gen_random_uuid() NOT NULL
+	id text NOT NULL
 		PRIMARY KEY,
 	name varchar(255) NOT NULL,
 	description text,
@@ -140,7 +140,7 @@ COMMENT ON COLUMN workflow_node_templates.depends_on IS 'JSONB array of workflow
 
 CREATE TABLE IF NOT EXISTS workflow_templates
 (
-	id uuid DEFAULT gen_random_uuid() NOT NULL
+	id text NOT NULL
 		PRIMARY KEY,
 	name varchar(100) NOT NULL,
 	description text,
@@ -148,7 +148,7 @@ CREATE TABLE IF NOT EXISTS workflow_templates
 	nodes jsonb NOT NULL,
 	created_at timestamp with time zone DEFAULT now() NOT NULL,
 	updated_at timestamp with time zone DEFAULT now() NOT NULL,
-	end_node_template_id uuid
+	end_node_template_id text
 		CONSTRAINT fk_workflow_templates_end_node_template
 			references workflow_node_templates
 				ON UPDATE CASCADE ON DELETE SET NULL
@@ -184,16 +184,16 @@ CREATE INDEX IF NOT EXISTS idx_workflow_node_templates_depends_on
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS workflow_template_maps
 (
-	id uuid DEFAULT gen_random_uuid() NOT NULL
+	id text NOT NULL
 		PRIMARY KEY,
-	hs_code_id uuid NOT NULL
+	hs_code_id text NOT NULL
 		CONSTRAINT fk_workflow_template_maps_hs_code
 			references hs_codes
 				ON UPDATE CASCADE ON DELETE RESTRICT,
 	consignment_flow varchar(50) NOT NULL
 		CONSTRAINT workflow_template_maps_consignment_flow_check
 			CHECK ((consignment_flow)::text = ANY ((ARRAY['IMPORT'::character varying, 'EXPORT'::character varying])::text[])),
-	workflow_template_id uuid NOT NULL
+	workflow_template_id text NOT NULL
 		CONSTRAINT fk_workflow_template_maps_workflow_template
 			references workflow_templates
 				ON UPDATE CASCADE ON DELETE RESTRICT,
@@ -220,7 +220,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_workflow_template_maps_unique
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS customs_house_agents
 (
-	id         uuid      DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+	id         text      NOT NULL PRIMARY KEY,
 	name       varchar(255)                        NOT NULL,
 	description text,
 	email      varchar(255),
@@ -235,7 +235,7 @@ COMMENT ON TABLE customs_house_agents IS 'Clearing House Agents / Customs House 
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS consignments
 (
-	id uuid DEFAULT gen_random_uuid() NOT NULL
+	id text NOT NULL
 		PRIMARY KEY,
 	flow varchar(50) NOT NULL
 		CONSTRAINT consignments_flow_check
@@ -248,8 +248,8 @@ CREATE TABLE IF NOT EXISTS consignments
 	global_context jsonb NOT NULL,
 	created_at timestamp with time zone DEFAULT now() NOT NULL,
 	updated_at timestamp with time zone DEFAULT now() NOT NULL,
-	end_node_id uuid,
-	cha_id uuid REFERENCES customs_house_agents (id)
+	end_node_id text,
+	cha_id text REFERENCES customs_house_agents (id)
 );
 
 COMMENT ON TABLE consignments IS 'Consignment records for import/export workflows';
@@ -282,11 +282,11 @@ CREATE INDEX IF NOT EXISTS idx_consignments_cha_id
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS pre_consignment_templates
 (
-	id uuid DEFAULT gen_random_uuid() NOT NULL
+	id text NOT NULL
 		PRIMARY KEY,
 	name varchar(255) NOT NULL,
 	description text,
-	workflow_template_id uuid NOT NULL
+	workflow_template_id text NOT NULL
 		CONSTRAINT fk_pre_consignment_templates_workflow_template
 			references workflow_templates
 				ON UPDATE CASCADE ON DELETE RESTRICT,
@@ -313,10 +313,10 @@ CREATE INDEX IF NOT EXISTS idx_pre_consignment_templates_depends_on
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS pre_consignments
 (
-	id uuid DEFAULT gen_random_uuid() NOT NULL
+	id text NOT NULL
 		PRIMARY KEY,
 	trader_id varchar(255) NOT NULL,
-	pre_consignment_template_id uuid NOT NULL
+	pre_consignment_template_id text NOT NULL
 		CONSTRAINT fk_pre_consignments_template
 			references pre_consignment_templates
 				ON UPDATE CASCADE ON DELETE RESTRICT,
@@ -339,13 +339,13 @@ COMMENT ON COLUMN pre_consignments.trader_context IS 'JSONB context specific to 
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS workflow_nodes
 (
-	id uuid DEFAULT gen_random_uuid() NOT NULL
+	id text NOT NULL
 		PRIMARY KEY,
-	consignment_id uuid
+	consignment_id text
 		CONSTRAINT fk_workflow_nodes_consignment
 			references consignments
 				ON UPDATE CASCADE ON DELETE CASCADE,
-	workflow_node_template_id uuid NOT NULL
+	workflow_node_template_id text NOT NULL
 		CONSTRAINT fk_workflow_nodes_workflow_node_template
 			references workflow_node_templates
 				ON UPDATE CASCADE ON DELETE RESTRICT,
@@ -356,7 +356,7 @@ CREATE TABLE IF NOT EXISTS workflow_nodes
 	depends_on jsonb DEFAULT '[]'::jsonb NOT NULL,
 	created_at timestamp with time zone DEFAULT now() NOT NULL,
 	updated_at timestamp with time zone DEFAULT now() NOT NULL,
-	pre_consignment_id uuid
+	pre_consignment_id text
 		CONSTRAINT fk_workflow_nodes_pre_consignment
 			references pre_consignments
 				ON UPDATE CASCADE ON DELETE CASCADE,

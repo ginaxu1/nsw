@@ -4,12 +4,12 @@
 
 -- Create the workflows table (generic workflow instance)
 CREATE TABLE IF NOT EXISTS workflows (
-    id uuid NOT NULL PRIMARY KEY,
+    id text NOT NULL PRIMARY KEY,
     status varchar(50) NOT NULL DEFAULT 'IN_PROGRESS'
         CONSTRAINT workflows_status_check
             CHECK ((status)::text = ANY ((ARRAY['IN_PROGRESS'::character varying, 'COMPLETED'::character varying, 'FAILED'::character varying])::text[])),
     global_context jsonb NOT NULL DEFAULT '{}'::jsonb,
-    end_node_id uuid,
+    end_node_id text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
@@ -58,7 +58,7 @@ WHERE pc.state IN ('IN_PROGRESS', 'COMPLETED');
 -- ============================================================================
 -- Add workflow_id to workflow_nodes and populate from existing data
 -- ============================================================================
-ALTER TABLE workflow_nodes ADD COLUMN workflow_id uuid;
+ALTER TABLE workflow_nodes ADD COLUMN workflow_id text;
 
 UPDATE workflow_nodes SET workflow_id = COALESCE(consignment_id, pre_consignment_id);
 

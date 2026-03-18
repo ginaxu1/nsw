@@ -1,7 +1,5 @@
 package model
 
-import "github.com/google/uuid"
-
 type PreConsignmentState string
 
 const (
@@ -13,10 +11,10 @@ const (
 
 type PreConsignmentTemplate struct {
 	BaseModel
-	Name               string    `gorm:"type:varchar(255);column:name;not null" json:"name"`            // Human-readable name of the pre-consignment template
-	Description        string    `gorm:"type:text;column:description" json:"description"`               // Optional description of the pre-consignment template
-	WorkflowTemplateID uuid.UUID `json:"workflowTemplateId"`                                            // ID of the workflow template to use for this pre-consignment
-	DependsOn          []string  `gorm:"type:jsonb;column:depends_on;serializer:json" json:"dependsOn"` // List of pre-consignment template IDs that this pre-consignment template depends on
+	Name               string   `gorm:"type:varchar(255);column:name;not null" json:"name"`            // Human-readable name of the pre-consignment template
+	Description        string   `gorm:"type:text;column:description" json:"description"`               // Optional description of the pre-consignment template
+	WorkflowTemplateID string   `json:"workflowTemplateId"`                                            // ID of the workflow template to use for this pre-consignment
+	DependsOn          []string `gorm:"type:jsonb;column:depends_on;serializer:json" json:"dependsOn"` // List of pre-consignment template IDs that this pre-consignment template depends on
 }
 
 func (pct *PreConsignmentTemplate) TableName() string {
@@ -26,7 +24,7 @@ func (pct *PreConsignmentTemplate) TableName() string {
 type PreConsignment struct {
 	BaseModel
 	TraderID                 string              `gorm:"type:varchar(255);not null" json:"traderId"`
-	PreConsignmentTemplateID uuid.UUID           `gorm:"type:uuid;not null" json:"preConsignmentTemplateId"`
+	PreConsignmentTemplateID string              `gorm:"type:text;not null" json:"preConsignmentTemplateId"`
 	State                    PreConsignmentState `gorm:"type:varchar(50);not null" json:"state"`
 
 	// Relationships
@@ -40,7 +38,7 @@ func (pc *PreConsignment) TableName() string {
 
 // CreatePreConsignmentDTO is used to create a new pre-consignment.
 type CreatePreConsignmentDTO struct {
-	PreConsignmentTemplateID uuid.UUID `json:"preConsignmentTemplateId" validate:"required"` // ID of the pre-consignment template to use
+	PreConsignmentTemplateID string `json:"preConsignmentTemplateId" validate:"required"` // ID of the pre-consignment template to use
 }
 
 // UpdatePreConsignmentStateDTO is used to update the state of a pre-consignment.
@@ -51,16 +49,16 @@ type UpdatePreConsignmentStateDTO struct {
 
 // PreConsignmentTemplateResponseDTO represents a pre-consignment template in the response.
 type PreConsignmentTemplateResponseDTO struct {
-	ID          uuid.UUID `json:"id"`          // Template ID
-	Name        string    `json:"name"`        // Human-readable name
-	Description string    `json:"description"` // Description of the template
-	DependsOn   []string  `json:"dependsOn"`   // List of dependency template IDs
+	ID          string   `json:"id"`          // Template ID
+	Name        string   `json:"name"`        // Human-readable name
+	Description string   `json:"description"` // Description of the template
+	DependsOn   []string `json:"dependsOn"`   // List of dependency template IDs
 }
 
 // TraderPreConsignmentResponseDTO represents a pre-consignment template in the response.
 type TraderPreConsignmentResponseDTO struct {
-	ID               uuid.UUID           `json:"id"`                         // Template ID
-	PreConsignmentID *uuid.UUID          `json:"preConsignmentId,omitempty"` // Pre-consignment ID (if applicable)
+	ID               string              `json:"id"`                         // Template ID
+	PreConsignmentID *string             `json:"preConsignmentId,omitempty"` // Pre-consignment ID (if applicable)
 	Name             string              `json:"name"`                       // Human-readable name
 	Description      string              `json:"description"`                // Description of the template
 	DependsOn        []string            `json:"dependsOn"`                  // List of dependency template IDs
@@ -80,7 +78,7 @@ type TraderPreConsignmentsResponseDTO struct {
 
 // PreConsignmentResponseDTO represents a pre-consignment in the response.
 type PreConsignmentResponseDTO struct {
-	ID                     uuid.UUID                         `json:"id"`                     // Pre-consignment ID
+	ID                     string                            `json:"id"`                     // Pre-consignment ID
 	TraderID               string                            `json:"traderId"`               // Trader ID associated with the pre-consignment
 	State                  PreConsignmentState               `json:"state"`                  // State of the pre-consignment
 	TraderContext          map[string]any                    `json:"traderContext"`          // Trader-specific context

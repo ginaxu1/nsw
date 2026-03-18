@@ -10,9 +10,9 @@ import (
 
 func strPtr(s string) *string { return &s }
 
-func resolveForEvaluate(t *testing.T, uc *UnlockConfig, ids ...uuid.UUID) *UnlockConfig {
+func resolveForEvaluate(t *testing.T, uc *UnlockConfig, ids ...string) *UnlockConfig {
 	t.Helper()
-	templateToNodeID := make(map[uuid.UUID]uuid.UUID, len(ids))
+	templateToNodeID := make(map[string]string, len(ids))
 	for _, id := range ids {
 		templateToNodeID[id] = id
 	}
@@ -31,7 +31,7 @@ func TestUnlockConfig_Validate(t *testing.T) {
 			AnyOf: []UnlockGroup{
 				{
 					AllOf: []UnlockCondition{
-						{NodeTemplateID: uuid.New(), State: strPtr("COMPLETED")},
+						{NodeTemplateID: uuid.NewString(), State: strPtr("COMPLETED")},
 					},
 				},
 			},
@@ -44,7 +44,7 @@ func TestUnlockConfig_Validate(t *testing.T) {
 			AnyOf: []UnlockGroup{
 				{
 					AllOf: []UnlockCondition{
-						{NodeTemplateID: uuid.New(), Outcome: strPtr("APPROVED")},
+						{NodeTemplateID: uuid.NewString(), Outcome: strPtr("APPROVED")},
 					},
 				},
 			},
@@ -57,7 +57,7 @@ func TestUnlockConfig_Validate(t *testing.T) {
 			AnyOf: []UnlockGroup{
 				{
 					AllOf: []UnlockCondition{
-						{NodeTemplateID: uuid.New(), State: strPtr("COMPLETED"), Outcome: strPtr("APPROVED")},
+						{NodeTemplateID: uuid.NewString(), State: strPtr("COMPLETED"), Outcome: strPtr("APPROVED")},
 					},
 				},
 			},
@@ -84,7 +84,7 @@ func TestUnlockConfig_Validate(t *testing.T) {
 			AnyOf: []UnlockGroup{
 				{
 					AllOf: []UnlockCondition{
-						{NodeTemplateID: uuid.Nil, State: strPtr("COMPLETED")},
+						{NodeTemplateID: "", State: strPtr("COMPLETED")},
 					},
 				},
 			},
@@ -97,7 +97,7 @@ func TestUnlockConfig_Validate(t *testing.T) {
 			AnyOf: []UnlockGroup{
 				{
 					AllOf: []UnlockCondition{
-						{NodeTemplateID: uuid.New()},
+						{NodeTemplateID: uuid.NewString()},
 					},
 				},
 			},
@@ -112,7 +112,7 @@ func TestUnlockConfig_Validate(t *testing.T) {
 			AnyOf: []UnlockGroup{
 				{
 					AllOf: []UnlockCondition{
-						{NodeTemplateID: uuid.New(), State: strPtr("")},
+						{NodeTemplateID: uuid.NewString(), State: strPtr("")},
 					},
 				},
 			},
@@ -127,7 +127,7 @@ func TestUnlockConfig_Validate(t *testing.T) {
 			AnyOf: []UnlockGroup{
 				{
 					AllOf: []UnlockCondition{
-						{NodeTemplateID: uuid.New(), Outcome: strPtr("")},
+						{NodeTemplateID: uuid.NewString(), Outcome: strPtr("")},
 					},
 				},
 			},
@@ -142,13 +142,13 @@ func TestUnlockConfig_Validate(t *testing.T) {
 			AnyOf: []UnlockGroup{
 				{
 					AllOf: []UnlockCondition{
-						{NodeTemplateID: uuid.New(), State: strPtr("COMPLETED"), Outcome: strPtr("APPROVED")},
-						{NodeTemplateID: uuid.New(), State: strPtr("COMPLETED")},
+						{NodeTemplateID: uuid.NewString(), State: strPtr("COMPLETED"), Outcome: strPtr("APPROVED")},
+						{NodeTemplateID: uuid.NewString(), State: strPtr("COMPLETED")},
 					},
 				},
 				{
 					AllOf: []UnlockCondition{
-						{NodeTemplateID: uuid.New(), Outcome: strPtr("FAST_TRACKED")},
+						{NodeTemplateID: uuid.NewString(), Outcome: strPtr("FAST_TRACKED")},
 					},
 				},
 			},
@@ -158,8 +158,8 @@ func TestUnlockConfig_Validate(t *testing.T) {
 }
 
 func TestUnlockConfig_Evaluate(t *testing.T) {
-	nodeA := uuid.New()
-	nodeB := uuid.New()
+	nodeA := uuid.NewString()
+	nodeB := uuid.NewString()
 
 	t.Run("State Only - Condition Met", func(t *testing.T) {
 		uc := &UnlockConfig{
@@ -174,7 +174,7 @@ func TestUnlockConfig_Evaluate(t *testing.T) {
 
 		resolved := resolveForEvaluate(t, uc, nodeA, nodeB)
 
-		nodeMap := map[uuid.UUID]WorkflowNode{
+		nodeMap := map[string]WorkflowNode{
 			nodeA: {State: WorkflowNodeStateCompleted},
 		}
 		assert.True(t, resolved.Evaluate(nodeMap))
@@ -193,7 +193,7 @@ func TestUnlockConfig_Evaluate(t *testing.T) {
 
 		resolved := resolveForEvaluate(t, uc, nodeA, nodeB)
 
-		nodeMap := map[uuid.UUID]WorkflowNode{
+		nodeMap := map[string]WorkflowNode{
 			nodeA: {State: WorkflowNodeStateInProgress},
 		}
 		assert.False(t, resolved.Evaluate(nodeMap))
@@ -213,7 +213,7 @@ func TestUnlockConfig_Evaluate(t *testing.T) {
 		resolved := resolveForEvaluate(t, uc, nodeA, nodeB)
 
 		outcome := "APPROVED"
-		nodeMap := map[uuid.UUID]WorkflowNode{
+		nodeMap := map[string]WorkflowNode{
 			nodeA: {State: WorkflowNodeStateCompleted, Outcome: &outcome},
 		}
 		assert.True(t, resolved.Evaluate(nodeMap))
@@ -233,7 +233,7 @@ func TestUnlockConfig_Evaluate(t *testing.T) {
 		resolved := resolveForEvaluate(t, uc, nodeA, nodeB)
 
 		outcome := "REJECTED"
-		nodeMap := map[uuid.UUID]WorkflowNode{
+		nodeMap := map[string]WorkflowNode{
 			nodeA: {State: WorkflowNodeStateCompleted, Outcome: &outcome},
 		}
 		assert.False(t, resolved.Evaluate(nodeMap))
@@ -252,7 +252,7 @@ func TestUnlockConfig_Evaluate(t *testing.T) {
 
 		resolved := resolveForEvaluate(t, uc, nodeA, nodeB)
 
-		nodeMap := map[uuid.UUID]WorkflowNode{
+		nodeMap := map[string]WorkflowNode{
 			nodeA: {State: WorkflowNodeStateCompleted, Outcome: nil},
 		}
 		assert.False(t, resolved.Evaluate(nodeMap))
@@ -272,7 +272,7 @@ func TestUnlockConfig_Evaluate(t *testing.T) {
 		resolved := resolveForEvaluate(t, uc, nodeA, nodeB)
 
 		outcome := "APPROVED"
-		nodeMap := map[uuid.UUID]WorkflowNode{
+		nodeMap := map[string]WorkflowNode{
 			nodeA: {State: WorkflowNodeStateCompleted, Outcome: &outcome},
 		}
 		assert.True(t, resolved.Evaluate(nodeMap))
@@ -292,7 +292,7 @@ func TestUnlockConfig_Evaluate(t *testing.T) {
 		resolved := resolveForEvaluate(t, uc, nodeA, nodeB)
 
 		outcome := "REJECTED"
-		nodeMap := map[uuid.UUID]WorkflowNode{
+		nodeMap := map[string]WorkflowNode{
 			nodeA: {State: WorkflowNodeStateCompleted, Outcome: &outcome},
 		}
 		assert.False(t, resolved.Evaluate(nodeMap))
@@ -312,7 +312,7 @@ func TestUnlockConfig_Evaluate(t *testing.T) {
 		resolved := resolveForEvaluate(t, uc, nodeA, nodeB)
 
 		outcome := "APPROVED"
-		nodeMap := map[uuid.UUID]WorkflowNode{
+		nodeMap := map[string]WorkflowNode{
 			nodeA: {State: WorkflowNodeStateInProgress, Outcome: &outcome},
 		}
 		assert.False(t, resolved.Evaluate(nodeMap))
@@ -331,7 +331,7 @@ func TestUnlockConfig_Evaluate(t *testing.T) {
 
 		resolved := resolveForEvaluate(t, uc, nodeA, nodeB)
 
-		nodeMap := map[uuid.UUID]WorkflowNode{}
+		nodeMap := map[string]WorkflowNode{}
 		assert.False(t, resolved.Evaluate(nodeMap))
 	})
 
@@ -350,7 +350,7 @@ func TestUnlockConfig_Evaluate(t *testing.T) {
 		resolved := resolveForEvaluate(t, uc, nodeA, nodeB)
 
 		outcomeA := "APPROVED"
-		nodeMap := map[uuid.UUID]WorkflowNode{
+		nodeMap := map[string]WorkflowNode{
 			nodeA: {State: WorkflowNodeStateCompleted, Outcome: &outcomeA},
 			nodeB: {State: WorkflowNodeStateCompleted},
 		}
@@ -371,7 +371,7 @@ func TestUnlockConfig_Evaluate(t *testing.T) {
 
 		resolved := resolveForEvaluate(t, uc, nodeA, nodeB)
 
-		nodeMap := map[uuid.UUID]WorkflowNode{
+		nodeMap := map[string]WorkflowNode{
 			nodeA: {State: WorkflowNodeStateCompleted},
 			nodeB: {State: WorkflowNodeStateLocked},
 		}
@@ -396,7 +396,7 @@ func TestUnlockConfig_Evaluate(t *testing.T) {
 
 		resolved := resolveForEvaluate(t, uc, nodeA, nodeB)
 
-		nodeMap := map[uuid.UUID]WorkflowNode{
+		nodeMap := map[string]WorkflowNode{
 			nodeA: {State: WorkflowNodeStateCompleted},
 		}
 		assert.True(t, resolved.Evaluate(nodeMap))
@@ -421,7 +421,7 @@ func TestUnlockConfig_Evaluate(t *testing.T) {
 		resolved := resolveForEvaluate(t, uc, nodeA, nodeB)
 
 		outcome := "FAST_TRACKED"
-		nodeMap := map[uuid.UUID]WorkflowNode{
+		nodeMap := map[string]WorkflowNode{
 			nodeA: {State: WorkflowNodeStateCompleted, Outcome: &outcome},
 		}
 		assert.True(t, resolved.Evaluate(nodeMap))
@@ -446,7 +446,7 @@ func TestUnlockConfig_Evaluate(t *testing.T) {
 		resolved := resolveForEvaluate(t, uc, nodeA, nodeB)
 
 		outcome := "REJECTED"
-		nodeMap := map[uuid.UUID]WorkflowNode{
+		nodeMap := map[string]WorkflowNode{
 			nodeA: {State: WorkflowNodeStateCompleted, Outcome: &outcome},
 		}
 		assert.False(t, resolved.Evaluate(nodeMap))
@@ -474,7 +474,7 @@ func TestUnlockConfig_Evaluate(t *testing.T) {
 
 		// Test case 1: First group satisfied
 		outcomeB := "VERIFIED"
-		nodeMap1 := map[uuid.UUID]WorkflowNode{
+		nodeMap1 := map[string]WorkflowNode{
 			nodeA: {State: WorkflowNodeStateCompleted},
 			nodeB: {State: WorkflowNodeStateCompleted, Outcome: &outcomeB},
 		}
@@ -482,14 +482,14 @@ func TestUnlockConfig_Evaluate(t *testing.T) {
 
 		// Test case 2: Second group satisfied
 		outcomeFT := "FAST_TRACKED"
-		nodeMap2 := map[uuid.UUID]WorkflowNode{
+		nodeMap2 := map[string]WorkflowNode{
 			nodeA: {State: WorkflowNodeStateInProgress, Outcome: &outcomeFT},
 			nodeB: {State: WorkflowNodeStateLocked},
 		}
 		assert.True(t, resolved.Evaluate(nodeMap2))
 
 		// Test case 3: Neither group satisfied
-		nodeMap3 := map[uuid.UUID]WorkflowNode{
+		nodeMap3 := map[string]WorkflowNode{
 			nodeA: {State: WorkflowNodeStateCompleted},
 			nodeB: {State: WorkflowNodeStateLocked},
 		}
@@ -510,7 +510,7 @@ func TestUnlockConfig_Evaluate(t *testing.T) {
 
 		resolved := resolveForEvaluate(t, uc, nodeA, nodeB)
 
-		nodeMap := map[uuid.UUID]WorkflowNode{
+		nodeMap := map[string]WorkflowNode{
 			nodeA: {State: WorkflowNodeStateFailed},
 		}
 		assert.True(t, resolved.Evaluate(nodeMap))
@@ -536,20 +536,20 @@ func TestUnlockConfig_Evaluate(t *testing.T) {
 		resolved := resolveForEvaluate(t, uc, nodeA, nodeB)
 
 		// State matches but no outcome
-		nodeMap1 := map[uuid.UUID]WorkflowNode{
+		nodeMap1 := map[string]WorkflowNode{
 			nodeA: {State: WorkflowNodeStateCompleted},
 		}
 		assert.True(t, resolved.Evaluate(nodeMap1))
 
 		// Outcome matches but state is not COMPLETED (e.g. IN_PROGRESS with outcome set)
 		outcomeX := "X"
-		nodeMap2 := map[uuid.UUID]WorkflowNode{
+		nodeMap2 := map[string]WorkflowNode{
 			nodeA: {State: WorkflowNodeStateInProgress, Outcome: &outcomeX},
 		}
 		assert.True(t, resolved.Evaluate(nodeMap2))
 
 		// Neither matches
-		nodeMap3 := map[uuid.UUID]WorkflowNode{
+		nodeMap3 := map[string]WorkflowNode{
 			nodeA: {State: WorkflowNodeStateLocked},
 		}
 		assert.False(t, resolved.Evaluate(nodeMap3))
@@ -557,10 +557,10 @@ func TestUnlockConfig_Evaluate(t *testing.T) {
 }
 
 func TestUnlockConfig_ResolveToInstanceIDs(t *testing.T) {
-	templateA := uuid.New()
-	templateB := uuid.New()
-	instanceA := uuid.New()
-	instanceB := uuid.New()
+	templateA := uuid.NewString()
+	templateB := uuid.NewString()
+	instanceA := uuid.NewString()
+	instanceB := uuid.NewString()
 
 	t.Run("Successful Resolution", func(t *testing.T) {
 		uc := &UnlockConfig{
@@ -574,7 +574,7 @@ func TestUnlockConfig_ResolveToInstanceIDs(t *testing.T) {
 			},
 		}
 
-		mapping := map[uuid.UUID]uuid.UUID{
+		mapping := map[string]string{
 			templateA: instanceA,
 			templateB: instanceB,
 		}
@@ -607,7 +607,7 @@ func TestUnlockConfig_ResolveToInstanceIDs(t *testing.T) {
 			},
 		}
 
-		mapping := map[uuid.UUID]uuid.UUID{
+		mapping := map[string]string{
 			templateB: instanceB,
 		}
 
@@ -627,7 +627,7 @@ func TestUnlockConfig_ResolveToInstanceIDs(t *testing.T) {
 			},
 		}
 
-		mapping := map[uuid.UUID]uuid.UUID{
+		mapping := map[string]string{
 			templateA: instanceA,
 		}
 
@@ -643,7 +643,7 @@ func TestUnlockConfig_ResolveToInstanceIDs(t *testing.T) {
 
 func TestUnlockConfig_JSON(t *testing.T) {
 	t.Run("Marshal And Unmarshal - State And Outcome", func(t *testing.T) {
-		nodeID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+		nodeID := "00000000-0000-0000-0000-000000000001"
 		original := &UnlockConfig{
 			AnyOf: []UnlockGroup{
 				{
@@ -667,7 +667,7 @@ func TestUnlockConfig_JSON(t *testing.T) {
 	})
 
 	t.Run("Marshal And Unmarshal - State Only", func(t *testing.T) {
-		nodeID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+		nodeID := "00000000-0000-0000-0000-000000000001"
 		original := &UnlockConfig{
 			AnyOf: []UnlockGroup{
 				{
@@ -725,8 +725,8 @@ func TestUnlockConfig_JSON(t *testing.T) {
 }
 
 func TestUnlockConfig_Expression_Validate(t *testing.T) {
-	nodeA := uuid.New()
-	nodeB := uuid.New()
+	nodeA := uuid.NewString()
+	nodeB := uuid.NewString()
 
 	t.Run("Valid Nested Expression", func(t *testing.T) {
 		uc := &UnlockConfig{
@@ -774,9 +774,9 @@ func TestUnlockConfig_Expression_Validate(t *testing.T) {
 }
 
 func TestUnlockConfig_Expression_Evaluate(t *testing.T) {
-	nodeA := uuid.New()
-	nodeB := uuid.New()
-	nodeC := uuid.New()
+	nodeA := uuid.NewString()
+	nodeB := uuid.NewString()
+	nodeC := uuid.NewString()
 
 	uc := &UnlockConfig{
 		Expression: &UnlockExpression{
@@ -795,19 +795,19 @@ func TestUnlockConfig_Expression_Evaluate(t *testing.T) {
 	resolved := resolveForEvaluate(t, uc, nodeA, nodeB, nodeC)
 
 	outcomeApproved := "APPROVED"
-	assert.True(t, resolved.Evaluate(map[uuid.UUID]WorkflowNode{
+	assert.True(t, resolved.Evaluate(map[string]WorkflowNode{
 		nodeA: {State: WorkflowNodeStateCompleted},
 		nodeB: {State: WorkflowNodeStateCompleted, Outcome: &outcomeApproved},
 		nodeC: {State: WorkflowNodeStateLocked},
 	}))
 
-	assert.True(t, resolved.Evaluate(map[uuid.UUID]WorkflowNode{
+	assert.True(t, resolved.Evaluate(map[string]WorkflowNode{
 		nodeA: {State: WorkflowNodeStateCompleted},
 		nodeB: {State: WorkflowNodeStateCompleted},
 		nodeC: {State: WorkflowNodeStateFailed},
 	}))
 
-	assert.False(t, resolved.Evaluate(map[uuid.UUID]WorkflowNode{
+	assert.False(t, resolved.Evaluate(map[string]WorkflowNode{
 		nodeA: {State: WorkflowNodeStateInProgress},
 		nodeB: {State: WorkflowNodeStateCompleted, Outcome: &outcomeApproved},
 		nodeC: {State: WorkflowNodeStateFailed},
@@ -815,10 +815,10 @@ func TestUnlockConfig_Expression_Evaluate(t *testing.T) {
 }
 
 func TestUnlockConfig_Expression_ResolveToInstanceIDs(t *testing.T) {
-	templateA := uuid.New()
-	templateB := uuid.New()
-	instanceA := uuid.New()
-	instanceB := uuid.New()
+	templateA := uuid.NewString()
+	templateB := uuid.NewString()
+	instanceA := uuid.NewString()
+	instanceB := uuid.NewString()
 
 	uc := &UnlockConfig{
 		Expression: &UnlockExpression{
@@ -829,7 +829,7 @@ func TestUnlockConfig_Expression_ResolveToInstanceIDs(t *testing.T) {
 		},
 	}
 
-	resolved, err := uc.ResolveToInstanceIDs(map[uuid.UUID]uuid.UUID{
+	resolved, err := uc.ResolveToInstanceIDs(map[string]string{
 		templateA: instanceA,
 		templateB: instanceB,
 	})

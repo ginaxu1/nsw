@@ -9,22 +9,22 @@ import (
 )
 
 func TestUUIDArray_MarshalJSON(t *testing.T) {
-	u1 := uuid.New()
-	u2 := uuid.New()
+	u1 := uuid.NewString()
+	u2 := uuid.NewString()
 
 	tests := []struct {
 		name     string
-		input    UUIDArray
+		input    StringArray
 		expected string
 	}{
 		{
 			name:     "Populated",
-			input:    UUIDArray{u1, u2},
-			expected: `["` + u1.String() + `","` + u2.String() + `"]`,
+			input:    StringArray{u1, u2},
+			expected: `["` + u1 + `","` + u2 + `"]`,
 		},
 		{
 			name:     "Empty",
-			input:    UUIDArray{},
+			input:    StringArray{},
 			expected: `[]`,
 		},
 		{
@@ -44,38 +44,38 @@ func TestUUIDArray_MarshalJSON(t *testing.T) {
 }
 
 func TestUUIDArray_UnmarshalJSON(t *testing.T) {
-	u1 := uuid.New()
-	u2 := uuid.New()
+	u1 := uuid.NewString()
+	u2 := uuid.NewString()
 
 	tests := []struct {
 		name      string
 		input     string
 		expectErr bool
-		expected  UUIDArray
+		expected  StringArray
 	}{
 		{
 			name:      "Valid Populated",
-			input:     `["` + u1.String() + `","` + u2.String() + `"]`,
+			input:     `["` + u1 + `","` + u2 + `"]`,
 			expectErr: false,
-			expected:  UUIDArray{u1, u2},
+			expected:  StringArray{u1, u2},
 		},
 		{
 			name:      "Valid Empty",
 			input:     `[]`,
 			expectErr: false,
-			expected:  UUIDArray{},
+			expected:  StringArray{},
 		},
 		{
 			name:      "Null",
 			input:     `null`,
 			expectErr: false,
-			expected:  UUIDArray{},
+			expected:  StringArray{},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var result UUIDArray
+			var result StringArray
 			err := json.Unmarshal([]byte(tt.input), &result)
 			if tt.expectErr {
 				assert.Error(t, err)
@@ -99,14 +99,14 @@ func TestModel_TableNames(t *testing.T) {
 }
 
 func TestModel_WorkflowTemplate_GetNodeTemplateIDs(t *testing.T) {
-	id1 := uuid.New()
-	id2 := uuid.New()
+	id1 := uuid.NewString()
+	id2 := uuid.NewString()
 	wt := &WorkflowTemplate{
-		NodeTemplates: UUIDArray{id1, id2},
+		NodeTemplates: StringArray{id1, id2},
 	}
 	ids := wt.GetNodeTemplateIDs()
 	assert.Len(t, ids, 2)
-	assert.ElementsMatch(t, []uuid.UUID{id1, id2}, ids)
+	assert.ElementsMatch(t, []string{id1, id2}, ids)
 }
 
 func TestModel_BaseHooks(t *testing.T) {

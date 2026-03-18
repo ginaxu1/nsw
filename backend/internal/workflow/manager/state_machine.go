@@ -1,12 +1,10 @@
 package manager
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"sort"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	"github.com/OpenNSW/nsw/internal/workflow/model"
@@ -21,7 +19,7 @@ type StateTransitionResult struct {
 
 // WorkflowCompletionConfig holds configuration for determining workflow completion.
 type WorkflowCompletionConfig struct {
-	EndNodeID *uuid.UUID
+	EndNodeID *string
 }
 
 // WorkflowNodeStateMachine handles workflow node state transitions and dependency propagation.
@@ -58,7 +56,7 @@ func (sm *WorkflowNodeStateMachine) TransitionToCompleted(
 	node.ExtendedState = updateReq.ExtendedState
 	node.Outcome = updateReq.Outcome
 	nodesToUpdate := []model.WorkflowNode{*node}
-	updatedNodeIndex := map[uuid.UUID]int{node.ID: 0}
+	updatedNodeIndex := map[string]int{node.ID: 0}
 
 	allNodes, err := sm.getSiblingNodes(ctx, tx, node)
 	if err != nil {
@@ -170,14 +168,14 @@ func (sm *WorkflowNodeStateMachine) TransitionToInProgress(
 func (sm *WorkflowNodeStateMachine) InitializeNodesFromTemplates(
 	ctx context.Context,
 	tx *gorm.DB,
-	workflowID uuid.UUID,
+	workflowID string,
 	nodeTemplates []model.WorkflowNodeTemplate,
-) ([]model.WorkflowNode, []model.WorkflowNode, *uuid.UUID, error) {
+) ([]model.WorkflowNode, []model.WorkflowNode, *string, error) {
 	if len(nodeTemplates) == 0 {
 		return []model.WorkflowNode{}, []model.WorkflowNode{}, nil, nil
 	}
 
-	templateMap := make(map[uuid.UUID]model.WorkflowNodeTemplate)
+	templateMap := make(map[string]model.WorkflowNodeTemplate)
 	for _, t := range nodeTemplates {
 		templateMap[t.ID] = t
 	}
@@ -188,7 +186,7 @@ func (sm *WorkflowNodeStateMachine) InitializeNodesFromTemplates(
 			WorkflowID:             workflowID,
 			WorkflowNodeTemplateID: template.ID,
 			State:                  model.WorkflowNodeStateLocked,
-			DependsOn:              model.UUIDArray(make([]uuid.UUID, 0)),
+			DependsOn:              model.StringArray(make([]string, 0)),
 		}
 		workflowNodes = append(workflowNodes, workflowNode)
 	}
@@ -198,19 +196,19 @@ func (sm *WorkflowNodeStateMachine) InitializeNodesFromTemplates(
 		return nil, nil, nil, fmt.Errorf("failed to create workflow nodes: %w", err)
 	}
 
-	nodeByTemplateID := make(map[uuid.UUID]model.WorkflowNode)
+	nodeByTemplateID := make(map[string]model.WorkflowNode)
 	for _, node := range createdNodes {
 		nodeByTemplateID[node.WorkflowNodeTemplateID] = node
 	}
 
 	var nodesToUpdate []model.WorkflowNode
 	var newReadyNodes []model.WorkflowNode
-	templateToNodeID := make(map[uuid.UUID]uuid.UUID)
+	templateToNodeID := make(map[string]string)
 	for templateID, node := range nodeByTemplateID {
 		templateToNodeID[templateID] = node.ID
 	}
 
-	var endNodeID *uuid.UUID
+	var endNodeID *string
 	for i, node := range createdNodes {
 		template, exists := templateMap[node.WorkflowNodeTemplateID]
 		if !exists {
@@ -221,7 +219,7 @@ func (sm *WorkflowNodeStateMachine) InitializeNodesFromTemplates(
 			endNodeID = &createdNodes[i].ID
 		}
 
-		dependsOnNodeIDs := make([]uuid.UUID, 0)
+		dependsOnNodeIDs := make([]string, 0)
 		for _, dependsOnTemplateID := range template.DependsOn {
 			if depNode, found := nodeByTemplateID[dependsOnTemplateID]; found {
 				dependsOnNodeIDs = append(dependsOnNodeIDs, depNode.ID)
@@ -266,7 +264,7 @@ func (sm *WorkflowNodeStateMachine) InitializeNodesFromTemplates(
 
 func (sm *WorkflowNodeStateMachine) unlockDependentNodes(
 	allNodes []model.WorkflowNode,
-	nodeStateMap map[uuid.UUID]model.WorkflowNode,
+	nodeStateMap map[string]model.WorkflowNode,
 ) []model.WorkflowNode {
 	var unlockedNodes []model.WorkflowNode
 	for _, node := range allNodes {
@@ -286,7 +284,7 @@ func (sm *WorkflowNodeStateMachine) unlockDependentNodes(
 
 func (sm *WorkflowNodeStateMachine) areDependenciesMet(
 	node model.WorkflowNode,
-	nodeMap map[uuid.UUID]model.WorkflowNode,
+	nodeMap map[string]model.WorkflowNode,
 ) bool {
 	if node.UnlockConfiguration != nil {
 		return node.UnlockConfiguration.Evaluate(nodeMap)
@@ -306,7 +304,7 @@ func (sm *WorkflowNodeStateMachine) areDependenciesMet(
 
 func (sm *WorkflowNodeStateMachine) evaluateWorkflowCompletion(
 	allNodes []model.WorkflowNode,
-	nodeStateMap map[uuid.UUID]model.WorkflowNode,
+	nodeStateMap map[string]model.WorkflowNode,
 	config *WorkflowCompletionConfig,
 ) bool {
 	if config != nil && config.EndNodeID != nil {
@@ -331,8 +329,8 @@ func (sm *WorkflowNodeStateMachine) evaluateWorkflowCompletion(
 	return true
 }
 
-func (sm *WorkflowNodeStateMachine) buildNodeStateMap(allNodes []model.WorkflowNode) map[uuid.UUID]model.WorkflowNode {
-	nodeStateMap := make(map[uuid.UUID]model.WorkflowNode, len(allNodes))
+func (sm *WorkflowNodeStateMachine) buildNodeStateMap(allNodes []model.WorkflowNode) map[string]model.WorkflowNode {
+	nodeStateMap := make(map[string]model.WorkflowNode, len(allNodes))
 	for _, node := range allNodes {
 		nodeStateMap[node.ID] = node
 	}
@@ -353,7 +351,7 @@ func (sm *WorkflowNodeStateMachine) canTransitionToInProgress(currentState model
 
 func (sm *WorkflowNodeStateMachine) sortNodesByID(nodes []model.WorkflowNode) {
 	sort.Slice(nodes, func(i, j int) bool {
-		return bytes.Compare(nodes[i].ID[:], nodes[j].ID[:]) < 0
+		return nodes[i].ID < nodes[j].ID
 	})
 }
 

@@ -28,8 +28,8 @@ func TestHSCodeService_GetAllHSCodes(t *testing.T) {
 		sqlMock.ExpectQuery(`SELECT \* FROM "hs_codes" ORDER BY hs_code ASC LIMIT \$1`).
 			WithArgs(50). // Default limit
 			WillReturnRows(sqlmock.NewRows([]string{"id", "hs_code"}).
-				AddRow(uuid.New(), "1234.56").
-				AddRow(uuid.New(), "7890.12"))
+				AddRow(uuid.NewString(), "1234.56").
+				AddRow(uuid.NewString(), "7890.12"))
 
 		result, err := service.GetAllHSCodes(ctx, filter)
 		assert.NoError(t, err)
@@ -52,7 +52,7 @@ func TestHSCodeService_GetAllHSCodes(t *testing.T) {
 		sqlMock.ExpectQuery(`SELECT \* FROM "hs_codes" WHERE hs_code LIKE \$1 ORDER BY hs_code ASC LIMIT \$2`).
 			WithArgs("12%", 50).
 			WillReturnRows(sqlmock.NewRows([]string{"id", "hs_code"}).
-				AddRow(uuid.New(), "1234.56"))
+				AddRow(uuid.NewString(), "1234.56"))
 
 		result, err := service.GetAllHSCodes(ctx, filter)
 		assert.NoError(t, err)
@@ -80,7 +80,7 @@ func TestHSCodeService_GetHSCodeByID(t *testing.T) {
 	db, sqlMock := setupTestDB(t)
 	service := NewHSCodeService(db)
 	ctx := context.Background()
-	hsCodeID := uuid.New()
+	hsCodeID := uuid.NewString()
 
 	t.Run("Success", func(t *testing.T) {
 		sqlMock.ExpectQuery(`SELECT \* FROM "hs_codes" WHERE id = \$1 ORDER BY "hs_codes"."id" LIMIT \$2`).

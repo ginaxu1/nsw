@@ -52,9 +52,9 @@ func (s *UploadService) Upload(ctx context.Context, filename string, reader io.R
 	if mime == "" {
 		mime = "application/octet-stream"
 	}
-	id := uuid.New()
+	id := uuid.NewString()
 	ext := filepath.Ext(filename)
-	key := fmt.Sprintf("%s%s", id.String(), ext)
+	key := fmt.Sprintf("%s%s", id, ext)
 
 	// Wrap the reader so we can determine the actual number of bytes written,
 	// rather than trusting any client-supplied size hints.

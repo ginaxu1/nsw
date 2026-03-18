@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	formmodel "github.com/OpenNSW/nsw/internal/form/model"
@@ -21,7 +20,7 @@ var ErrFormNotFound = errors.New("form not found")
 type FormService interface {
 	// GetFormByID retrieves a form by its UUID
 	// Returns the JSON Schema and UI Schema that portals can directly use with JSON Forms
-	GetFormByID(ctx context.Context, formID uuid.UUID) (*formmodel.FormResponse, error)
+	GetFormByID(ctx context.Context, formID string) (*formmodel.FormResponse, error)
 }
 
 type formService struct {
@@ -36,8 +35,8 @@ func NewFormService(db *gorm.DB) FormService {
 }
 
 // GetFormByID retrieves a form by its UUID
-func (s *formService) GetFormByID(ctx context.Context, formID uuid.UUID) (*formmodel.FormResponse, error) {
-	if formID == uuid.Nil {
+func (s *formService) GetFormByID(ctx context.Context, formID string) (*formmodel.FormResponse, error) {
+	if formID == "" {
 		return nil, fmt.Errorf("formID cannot be nil")
 	}
 

@@ -3,8 +3,6 @@ package service
 import (
 	"context"
 
-	"github.com/google/uuid"
-
 	"github.com/OpenNSW/nsw/internal/workflow/model"
 )
 
@@ -12,16 +10,16 @@ import (
 // This abstraction allows for easier testing and flexibility in template storage.
 type TemplateProvider interface {
 	// GetWorkflowTemplateByHSCodeIDAndFlow retrieves the workflow template associated with a given HS code and consignment flow.
-	GetWorkflowTemplateByHSCodeIDAndFlow(ctx context.Context, hsCodeID uuid.UUID, flow model.ConsignmentFlow) (*model.WorkflowTemplate, error)
+	GetWorkflowTemplateByHSCodeIDAndFlow(ctx context.Context, hsCodeID string, flow model.ConsignmentFlow) (*model.WorkflowTemplate, error)
 
 	// GetWorkflowTemplateByID retrieves a workflow template by its ID.
-	GetWorkflowTemplateByID(ctx context.Context, id uuid.UUID) (*model.WorkflowTemplate, error)
+	GetWorkflowTemplateByID(ctx context.Context, id string) (*model.WorkflowTemplate, error)
 
 	// GetWorkflowNodeTemplatesByIDs retrieves workflow node templates by their IDs.
-	GetWorkflowNodeTemplatesByIDs(ctx context.Context, ids []uuid.UUID) ([]model.WorkflowNodeTemplate, error)
+	GetWorkflowNodeTemplatesByIDs(ctx context.Context, ids []string) ([]model.WorkflowNodeTemplate, error)
 
 	// GetWorkflowNodeTemplateByID retrieves a workflow node template by its ID.
-	GetWorkflowNodeTemplateByID(ctx context.Context, id uuid.UUID) (*model.WorkflowNodeTemplate, error)
+	GetWorkflowNodeTemplateByID(ctx context.Context, id string) (*model.WorkflowNodeTemplate, error)
 
 	// GetEndNodeTemplate retrieves the special end node template.
 	GetEndNodeTemplate(ctx context.Context) (*model.WorkflowNodeTemplate, error)

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	"github.com/OpenNSW/nsw/internal/workflow/model"
@@ -81,7 +80,7 @@ func (s *HSCodeService) GetAllHSCodes(ctx context.Context, filter model.HSCodeFi
 }
 
 // GetHSCodeByID retrieves an HS code by its ID from the database
-func (s *HSCodeService) GetHSCodeByID(ctx context.Context, hsCodeID uuid.UUID) (*model.HSCode, error) {
+func (s *HSCodeService) GetHSCodeByID(ctx context.Context, hsCodeID string) (*model.HSCode, error) {
 	var hsCode model.HSCode
 	result := s.db.WithContext(ctx).First(&hsCode, "id = ?", hsCodeID)
 	if result.Error != nil {

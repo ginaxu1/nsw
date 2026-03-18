@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
@@ -37,7 +36,7 @@ func NewPreConsignmentService(db *gorm.DB, templateProvider TemplateProvider, wo
 // --- WorkflowEventHandler implementation ---
 
 // OnWorkflowStatusChanged handles workflow lifecycle state propagation to pre-consignment domain state.
-func (s *PreConsignmentService) OnWorkflowStatusChanged(_ context.Context, tx *gorm.DB, workflowID uuid.UUID, _ model.WorkflowStatus, toStatus model.WorkflowStatus, workflow *model.Workflow) error {
+func (s *PreConsignmentService) OnWorkflowStatusChanged(_ context.Context, tx *gorm.DB, workflowID string, _ model.WorkflowStatus, toStatus model.WorkflowStatus, workflow *model.Workflow) error {
 	var preConsignment model.PreConsignment
 	if err := tx.First(&preConsignment, "id = ?", workflowID).Error; err != nil {
 		return fmt.Errorf("failed to retrieve pre-consignment %s: %w", workflowID, err)
@@ -100,7 +99,7 @@ func (s *PreConsignmentService) GetTraderPreConsignments(ctx context.Context, tr
 	}
 
 	// Build a set of template IDs to PreConsignment for quick lookup
-	templateIDToPreConsignment := make(map[uuid.UUID]model.PreConsignment)
+	templateIDToPreConsignment := make(map[string]model.PreConsignment)
 	for _, pc := range preConsignments {
 		templateIDToPreConsignment[pc.PreConsignmentTemplateID] = pc
 	}
@@ -123,12 +122,7 @@ func (s *PreConsignmentService) GetTraderPreConsignments(ctx context.Context, tr
 		state := model.PreConsignmentStateReady
 		if len(template.DependsOn) > 0 {
 			for _, depIDStr := range template.DependsOn {
-				depID, err := uuid.Parse(depIDStr)
-				if err != nil {
-					state = model.PreConsignmentStateLocked
-					break
-				}
-				if depPC, exists := templateIDToPreConsignment[depID]; !exists || depPC.State != model.PreConsignmentStateCompleted {
+				if depPC, exists := templateIDToPreConsignment[depIDStr]; !exists || depPC.State != model.PreConsignmentStateCompleted {
 					state = model.PreConsignmentStateLocked
 					break
 				}
@@ -289,7 +283,7 @@ func (s *PreConsignmentService) GetPreConsignmentsByTraderID(ctx context.Context
 }
 
 // GetPreConsignmentByID retrieves a pre-consignment by its ID with loaded workflow nodes and template.
-func (s *PreConsignmentService) GetPreConsignmentByID(ctx context.Context, preConsignmentID uuid.UUID) (*model.PreConsignmentResponseDTO, error) {
+func (s *PreConsignmentService) GetPreConsignmentByID(ctx context.Context, preConsignmentID string) (*model.PreConsignmentResponseDTO, error) {
 	var preConsignment model.PreConsignment
 	result := s.db.WithContext(ctx).
 		Preload("PreConsignmentTemplate").

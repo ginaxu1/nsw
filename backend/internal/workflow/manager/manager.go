@@ -7,7 +7,6 @@ import (
 	"maps"
 	"sync"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	taskManager "github.com/OpenNSW/nsw/internal/task/manager"
@@ -17,25 +16,25 @@ import (
 
 // NodeTemplateProvider defines the minimal interface for retrieving node template metadata.
 type NodeTemplateProvider interface {
-	GetWorkflowNodeTemplateByID(ctx context.Context, id uuid.UUID) (*model.WorkflowNodeTemplate, error)
-	GetWorkflowNodeTemplatesByIDs(ctx context.Context, ids []uuid.UUID) ([]model.WorkflowNodeTemplate, error)
+	GetWorkflowNodeTemplateByID(ctx context.Context, id string) (*model.WorkflowNodeTemplate, error)
+	GetWorkflowNodeTemplatesByIDs(ctx context.Context, ids []string) ([]model.WorkflowNodeTemplate, error)
 	GetEndNodeTemplate(ctx context.Context) (*model.WorkflowNodeTemplate, error)
 }
 
 // WorkflowNodeRepository defines the workflow node data access methods used by the manager.
 type WorkflowNodeRepository interface {
-	GetWorkflowNodeByIDInTx(ctx context.Context, tx *gorm.DB, nodeID uuid.UUID) (*model.WorkflowNode, error)
-	GetWorkflowNodesByIDsInTx(ctx context.Context, tx *gorm.DB, nodeIDs []uuid.UUID) ([]model.WorkflowNode, error)
+	GetWorkflowNodeByIDInTx(ctx context.Context, tx *gorm.DB, nodeID string) (*model.WorkflowNode, error)
+	GetWorkflowNodesByIDsInTx(ctx context.Context, tx *gorm.DB, nodeIDs []string) ([]model.WorkflowNode, error)
 	CreateWorkflowNodesInTx(ctx context.Context, tx *gorm.DB, nodes []model.WorkflowNode) ([]model.WorkflowNode, error)
 	UpdateWorkflowNodesInTx(ctx context.Context, tx *gorm.DB, nodes []model.WorkflowNode) error
-	GetWorkflowNodesByWorkflowIDInTx(ctx context.Context, tx *gorm.DB, workflowID uuid.UUID) ([]model.WorkflowNode, error)
-	GetWorkflowNodesByWorkflowIDsInTx(ctx context.Context, tx *gorm.DB, workflowIDs []uuid.UUID) ([]model.WorkflowNode, error)
-	CountIncompleteNodesByWorkflowID(ctx context.Context, tx *gorm.DB, workflowID uuid.UUID) (int64, error)
+	GetWorkflowNodesByWorkflowIDInTx(ctx context.Context, tx *gorm.DB, workflowID string) ([]model.WorkflowNode, error)
+	GetWorkflowNodesByWorkflowIDsInTx(ctx context.Context, tx *gorm.DB, workflowIDs []string) ([]model.WorkflowNode, error)
+	CountIncompleteNodesByWorkflowID(ctx context.Context, tx *gorm.DB, workflowID string) (int64, error)
 }
 
 // WorkflowEventHandler defines the domain callbacks the generic manager invokes.
 type WorkflowEventHandler interface {
-	OnWorkflowStatusChanged(ctx context.Context, tx *gorm.DB, workflowID uuid.UUID, fromStatus model.WorkflowStatus, toStatus model.WorkflowStatus, workflow *model.Workflow) error
+	OnWorkflowStatusChanged(ctx context.Context, tx *gorm.DB, workflowID string, fromStatus model.WorkflowStatus, toStatus model.WorkflowStatus, workflow *model.Workflow) error
 }
 
 // TaskInitHandler registers READY workflow nodes with the task manager.
@@ -43,10 +42,10 @@ type TaskInitHandler func(ctx context.Context, request taskManager.InitTaskReque
 
 // Manager defines the public contract for the generic workflow engine.
 type Manager interface {
-	StartWorkflowInstance(ctx context.Context, tx *gorm.DB, workflowID uuid.UUID, workflowTemplates []model.WorkflowTemplate, globalContext map[string]any, handler WorkflowEventHandler) error
+	StartWorkflowInstance(ctx context.Context, tx *gorm.DB, workflowID string, workflowTemplates []model.WorkflowTemplate, globalContext map[string]any, handler WorkflowEventHandler) error
 	RegisterTaskHandler(callback TaskInitHandler) error
 	HandleTaskUpdate(ctx context.Context, update taskManager.WorkflowManagerNotification) error
-	GetWorkflowInstance(ctx context.Context, workflowID uuid.UUID) (*model.Workflow, error)
+	GetWorkflowInstance(ctx context.Context, workflowID string) (*model.Workflow, error)
 }
 
 // workflowManager is the generic workflow engine implementation.
@@ -55,7 +54,7 @@ type workflowManager struct {
 	stateMachine         *WorkflowNodeStateMachine
 	nodeRepo             WorkflowNodeRepository
 	nodeTemplateProvider NodeTemplateProvider
-	handlerMap           map[uuid.UUID]WorkflowEventHandler
+	handlerMap           map[string]WorkflowEventHandler
 	initTaskCallback     TaskInitHandler
 	mu                   sync.RWMutex
 	db                   *gorm.DB
@@ -73,7 +72,7 @@ func NewManager(
 		stateMachine:         NewWorkflowNodeStateMachine(nodeRepo),
 		nodeRepo:             nodeRepo,
 		nodeTemplateProvider: nodeTemplateProvider,
-		handlerMap:           make(map[uuid.UUID]WorkflowEventHandler),
+		handlerMap:           make(map[string]WorkflowEventHandler),
 		db:                   db,
 	}
 	return m
@@ -96,7 +95,7 @@ func (m *workflowManager) RegisterTaskHandler(callback TaskInitHandler) error {
 func (m *workflowManager) StartWorkflowInstance(
 	ctx context.Context,
 	tx *gorm.DB,
-	workflowID uuid.UUID,
+	workflowID string,
 	workflowTemplates []model.WorkflowTemplate,
 	globalContext map[string]any,
 	handler WorkflowEventHandler,
@@ -118,8 +117,8 @@ func (m *workflowManager) StartWorkflowInstance(
 		return fmt.Errorf("failed to create workflow: %w", err)
 	}
 
-	uniqueNodeTemplateIDs := make(map[uuid.UUID]bool)
-	var depEndNodeTemplateIDs model.UUIDArray
+	uniqueNodeTemplateIDs := make(map[string]bool)
+	var depEndNodeTemplateIDs model.StringArray
 	for _, wt := range workflowTemplates {
 		for _, nodeTemplateID := range wt.GetNodeTemplateIDs() {
 			uniqueNodeTemplateIDs[nodeTemplateID] = true
@@ -129,7 +128,7 @@ func (m *workflowManager) StartWorkflowInstance(
 		}
 	}
 
-	nodeTemplateIDsList := make([]uuid.UUID, 0, len(uniqueNodeTemplateIDs))
+	nodeTemplateIDsList := make([]string, 0, len(uniqueNodeTemplateIDs))
 	for id := range uniqueNodeTemplateIDs {
 		nodeTemplateIDsList = append(nodeTemplateIDsList, id)
 	}
@@ -178,7 +177,7 @@ func (m *workflowManager) StartWorkflowInstance(
 }
 
 // GetWorkflowInstance returns the Workflow with preloaded WorkflowNodes and their templates.
-func (m *workflowManager) GetWorkflowInstance(ctx context.Context, workflowID uuid.UUID) (*model.Workflow, error) {
+func (m *workflowManager) GetWorkflowInstance(ctx context.Context, workflowID string) (*model.Workflow, error) {
 	var wf model.Workflow
 	if err := m.db.WithContext(ctx).
 		Preload("WorkflowNodes.WorkflowNodeTemplate").
@@ -331,7 +330,7 @@ func (m *workflowManager) processStateTransition(
 	return newReadyNodes, wf.GlobalContext, nil
 }
 
-func (m *workflowManager) findHandler(workflowID uuid.UUID) WorkflowEventHandler {
+func (m *workflowManager) findHandler(workflowID string) WorkflowEventHandler {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.handlerMap[workflowID]

@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	"github.com/OpenNSW/nsw/internal/config"
@@ -18,9 +17,9 @@ import (
 )
 
 type InitTaskRequest struct {
-	TaskID                 uuid.UUID   `json:"task_id"`
-	WorkflowID             uuid.UUID   `json:"workflow_id"`
-	WorkflowNodeTemplateID uuid.UUID   `json:"workflow_node_template_id"`
+	TaskID                 string      `json:"task_id"`
+	WorkflowID             string      `json:"workflow_id"`
+	WorkflowNodeTemplateID string      `json:"workflow_node_template_id"`
 	Type                   plugin.Type `json:"type"`
 	GlobalState            map[string]any
 	Config                 json.RawMessage `json:"config"`
@@ -39,7 +38,7 @@ type ExecuteTaskResponse struct {
 }
 
 // WorkflowUpdateHandler handles task completion notifications for the workflow manager.
-type WorkflowUpdateHandler func(ctx context.Context, taskID uuid.UUID, state *plugin.State, extendedState *string, appendGlobalContext map[string]any, outcome *string)
+type WorkflowUpdateHandler func(ctx context.Context, taskID string, state *plugin.State, extendedState *string, appendGlobalContext map[string]any, outcome *string)
 
 // TaskManager handles task execution and status management
 // Architecture: Trader Portal → Workflow Engine → Task Manager
@@ -60,8 +59,8 @@ type TaskManager interface {
 
 // ExecuteTaskRequest represents the request body for task execution
 type ExecuteTaskRequest struct {
-	WorkflowID uuid.UUID                `json:"workflow_id"`
-	TaskID     uuid.UUID                `json:"task_id"`
+	WorkflowID string                   `json:"workflow_id"`
+	TaskID     string                   `json:"task_id"`
 	Payload    *plugin.ExecutionRequest `json:"payload,omitempty"`
 }
 
@@ -101,12 +100,11 @@ func (tm *taskManager) RegisterUpstreamCallback(callback WorkflowUpdateHandler) 
 
 // GetTaskRenderInfo retrieves task rendering info (core logic)
 func (tm *taskManager) GetTaskRenderInfo(ctx context.Context, taskID string) (*plugin.ApiResponse, error) {
-	taskUUID, err := uuid.Parse(taskID)
-	if err != nil || taskUUID == uuid.Nil {
-		return nil, fmt.Errorf("taskID is invalid: %w", err)
+	if taskID == "" {
+		return nil, fmt.Errorf("taskID is required")
 	}
 
-	activeTask, err := tm.getTask(ctx, taskUUID)
+	activeTask, err := tm.getTask(ctx, taskID)
 	if err != nil {
 		return nil, fmt.Errorf("task %s not found: %w", taskID, err)
 	}
@@ -121,7 +119,7 @@ func (tm *taskManager) GetTaskRenderInfo(ctx context.Context, taskID string) (*p
 
 // ExecuteTask is the core logic for executing a task
 func (tm *taskManager) ExecuteTask(ctx context.Context, req ExecuteTaskRequest) (*plugin.ExecutionResponse, error) {
-	if req.TaskID == uuid.Nil {
+	if req.TaskID == "" {
 		return nil, fmt.Errorf("task_id is required")
 	}
 
@@ -247,7 +245,7 @@ func (tm *taskManager) execute(ctx context.Context, activeTask *container.Contai
 
 // getTask retrieves a task from the cache or store and combines it with the in-memory executor and returns a task container.
 // Uses double-checked locking to prevent duplicate container creation.
-func (tm *taskManager) getTask(ctx context.Context, taskID uuid.UUID) (*container.Container, error) {
+func (tm *taskManager) getTask(ctx context.Context, taskID string) (*container.Container, error) {
 	// First check (unlocked, fast path for cache hits)
 	if cachedContainer, found := tm.containerCache.Get(taskID); found {
 		slog.DebugContext(ctx, "container retrieved from cache",
@@ -324,7 +322,7 @@ func (tm *taskManager) getTask(ctx context.Context, taskID uuid.UUID) (*containe
 }
 
 // notifyWorkflowUpdateHandler sends state updates to Workflow Manager via the registered handler.
-func (tm *taskManager) notifyWorkflowUpdateHandler(ctx context.Context, taskID uuid.UUID, state *plugin.State, extendedState *string, appendGlobalContext map[string]any, outcome *string) {
+func (tm *taskManager) notifyWorkflowUpdateHandler(ctx context.Context, taskID string, state *plugin.State, extendedState *string, appendGlobalContext map[string]any, outcome *string) {
 	if tm.workflowUpdateHandler == nil {
 		slog.WarnContext(ctx, "workflow manager callback not configured, skipping notification",
 			"taskID", taskID,

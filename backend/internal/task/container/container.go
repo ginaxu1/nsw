@@ -4,16 +4,14 @@ import (
 	"context"
 	"sync"
 
-	"github.com/google/uuid"
-
 	"github.com/OpenNSW/nsw/internal/task/persistence"
 	"github.com/OpenNSW/nsw/internal/task/plugin"
 )
 
 type Container struct {
-	TaskID                 uuid.UUID
-	WorkflowID             uuid.UUID
-	WorkflowNodeTemplateID uuid.UUID
+	TaskID                 string
+	WorkflowID             string
+	WorkflowNodeTemplateID string
 	State                  plugin.State
 	Executable             plugin.Plugin
 	globalState            map[string]any
@@ -109,11 +107,11 @@ func (c *Container) Execute(ctx context.Context, request *plugin.ExecutionReques
 	return resp, nil
 }
 
-func (c *Container) GetTaskID() uuid.UUID {
+func (c *Container) GetTaskID() string {
 	return c.TaskID
 }
 
-func (c *Container) GetWorkflowID() uuid.UUID {
+func (c *Container) GetWorkflowID() string {
 	return c.WorkflowID
 }
 
@@ -145,7 +143,7 @@ func (c *Container) GetPluginState() string {
 // NewContainer creates a new container for a task with a given Executable plugin and FSM.
 // initialState is the task-level state to restore (InProgress for new tasks, or the
 // persisted state when rebuilding from the store after a cache miss).
-func NewContainer(taskId uuid.UUID, workflowId uuid.UUID, workflowNodeTemplateId uuid.UUID, initialState plugin.State, globalStore map[string]any, localStore persistence.Manager, taskStore persistence.TaskStoreInterface, executable plugin.Plugin, fsm *plugin.PluginFSM) *Container {
+func NewContainer(taskId string, workflowId string, workflowNodeTemplateId string, initialState plugin.State, globalStore map[string]any, localStore persistence.Manager, taskStore persistence.TaskStoreInterface, executable plugin.Plugin, fsm *plugin.PluginFSM) *Container {
 	c := &Container{
 		TaskID:                 taskId,
 		WorkflowID:             workflowId,

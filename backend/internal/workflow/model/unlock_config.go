@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-
-	"github.com/google/uuid"
 )
 
 // UnlockCondition represents a single condition that checks a specific dependency node's state and/or outcome.
@@ -14,10 +12,10 @@ import (
 // Used within UnlockGroup to form AND conditions across multiple nodes.
 type UnlockCondition struct {
 	// NodeTemplateID references the workflow node template to check (template-level).
-	NodeTemplateID uuid.UUID `json:"nodeTemplateId"`
+	NodeTemplateID string `json:"nodeTemplateId"`
 
 	// NodeID is the resolved workflow node instance ID (after resolution). Optional in the condition definition, but will be populated during evaluation.
-	NodeID *uuid.UUID `json:"nodeId,omitempty"`
+	NodeID *string `json:"nodeId,omitempty"`
 
 	// State is the expected state of the referenced node (e.g., "COMPLETED", "FAILED").
 	// Optional — if nil, the node's state is not checked.
@@ -45,10 +43,10 @@ type UnlockExpression struct {
 	AnyOf []UnlockExpression `json:"anyOf,omitempty"`
 	AllOf []UnlockExpression `json:"allOf,omitempty"`
 
-	NodeTemplateID uuid.UUID  `json:"nodeTemplateId,omitempty"`
-	NodeID         *uuid.UUID `json:"nodeId,omitempty"`
-	State          *string    `json:"state,omitempty"`
-	Outcome        *string    `json:"outcome,omitempty"`
+	NodeTemplateID string  `json:"nodeTemplateId,omitempty"`
+	NodeID         *string `json:"nodeId,omitempty"`
+	State          *string `json:"state,omitempty"`
+	Outcome        *string `json:"outcome,omitempty"`
 }
 
 // UnlockConfig represents the unlock configuration for a workflow node.
@@ -124,7 +122,7 @@ func (uc *UnlockConfig) Validate() error {
 }
 
 func (uc *UnlockConfig) validateCondition(cond UnlockCondition, path string) error {
-	if cond.NodeTemplateID == uuid.Nil {
+	if cond.NodeTemplateID == "" {
 		return fmt.Errorf("%s has nil nodeTemplateId", path)
 	}
 	if cond.State == nil && cond.Outcome == nil {
@@ -142,7 +140,7 @@ func (uc *UnlockConfig) validateCondition(cond UnlockCondition, path string) err
 func (uc *UnlockConfig) validateExpression(expr UnlockExpression, path string) error {
 	hasAny := len(expr.AnyOf) > 0
 	hasAll := len(expr.AllOf) > 0
-	hasLeaf := expr.NodeTemplateID != uuid.Nil || expr.State != nil || expr.Outcome != nil
+	hasLeaf := expr.NodeTemplateID != "" || expr.State != nil || expr.Outcome != nil
 
 	definedCount := 0
 	if hasAny {
@@ -189,7 +187,7 @@ func (uc *UnlockConfig) validateExpression(expr UnlockExpression, path string) e
 
 // ResolveToInstanceIDs creates a copy of the UnlockConfig with template IDs replaced by instance node IDs.
 // The templateToNodeID map should contain template ID -> node instance ID mappings.
-func (uc *UnlockConfig) ResolveToInstanceIDs(templateToNodeID map[uuid.UUID]uuid.UUID) (*UnlockConfig, error) {
+func (uc *UnlockConfig) ResolveToInstanceIDs(templateToNodeID map[string]string) (*UnlockConfig, error) {
 	// Validate the config before resolution
 	if err := uc.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid unlock configuration: %w", err)
@@ -227,7 +225,7 @@ func (uc *UnlockConfig) ResolveToInstanceIDs(templateToNodeID map[uuid.UUID]uuid
 	return resolved, nil
 }
 
-func (uc *UnlockConfig) resolveExpressionToInstanceIDs(expr UnlockExpression, templateToNodeID map[uuid.UUID]uuid.UUID) (UnlockExpression, error) {
+func (uc *UnlockConfig) resolveExpressionToInstanceIDs(expr UnlockExpression, templateToNodeID map[string]string) (UnlockExpression, error) {
 	resolved := UnlockExpression{
 		AnyOf:   make([]UnlockExpression, len(expr.AnyOf)),
 		AllOf:   make([]UnlockExpression, len(expr.AllOf)),
@@ -251,7 +249,7 @@ func (uc *UnlockConfig) resolveExpressionToInstanceIDs(expr UnlockExpression, te
 		resolved.AllOf[i] = childResolved
 	}
 
-	if expr.NodeTemplateID != uuid.Nil {
+	if expr.NodeTemplateID != "" {
 		nodeID, found := templateToNodeID[expr.NodeTemplateID]
 		if !found {
 			return UnlockExpression{}, fmt.Errorf("no instance node found for template ID %s in unlock configuration", expr.NodeTemplateID)
@@ -265,7 +263,7 @@ func (uc *UnlockConfig) resolveExpressionToInstanceIDs(expr UnlockExpression, te
 
 // Evaluate checks if the unlock conditions are satisfied given the current node states and outcomes.
 // The nodeMap should contain node ID -> WorkflowNode mappings with current states.
-func (uc *UnlockConfig) Evaluate(nodeMap map[uuid.UUID]WorkflowNode) bool {
+func (uc *UnlockConfig) Evaluate(nodeMap map[string]WorkflowNode) bool {
 	if uc.Expression != nil {
 		return uc.evaluateExpression(*uc.Expression, nodeMap)
 	}
@@ -280,7 +278,7 @@ func (uc *UnlockConfig) Evaluate(nodeMap map[uuid.UUID]WorkflowNode) bool {
 }
 
 // evaluateGroup checks if all conditions in a group are satisfied (AND).
-func (uc *UnlockConfig) evaluateGroup(group UnlockGroup, nodeMap map[uuid.UUID]WorkflowNode) bool {
+func (uc *UnlockConfig) evaluateGroup(group UnlockGroup, nodeMap map[string]WorkflowNode) bool {
 	for _, cond := range group.AllOf {
 		node, exists := nodeMap[*cond.NodeID]
 		if !exists {
@@ -300,7 +298,7 @@ func (uc *UnlockConfig) evaluateGroup(group UnlockGroup, nodeMap map[uuid.UUID]W
 	return true
 }
 
-func (uc *UnlockConfig) evaluateExpression(expr UnlockExpression, nodeMap map[uuid.UUID]WorkflowNode) bool {
+func (uc *UnlockConfig) evaluateExpression(expr UnlockExpression, nodeMap map[string]WorkflowNode) bool {
 	if len(expr.AnyOf) > 0 {
 		for _, child := range expr.AnyOf {
 			if uc.evaluateExpression(child, nodeMap) {
@@ -327,7 +325,7 @@ func (uc *UnlockConfig) evaluateExpression(expr UnlockExpression, nodeMap map[uu
 	}, nodeMap)
 }
 
-func (uc *UnlockConfig) evaluateCondition(cond UnlockCondition, nodeMap map[uuid.UUID]WorkflowNode) bool {
+func (uc *UnlockConfig) evaluateCondition(cond UnlockCondition, nodeMap map[string]WorkflowNode) bool {
 	node, exists := nodeMap[*cond.NodeID]
 	if !exists {
 		return false

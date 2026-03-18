@@ -16,15 +16,15 @@ import (
 // wfeAPI is a minimal API stub for WaitForEventTask tests.
 type wfeAPI struct {
 	pluginState     string
-	taskID          uuid.UUID
-	workflowID      uuid.UUID
+	taskID          string
+	workflowID      string
 	canTransition   func(action string) bool
 	transitionCalls []string
 	transitionErr   error
 }
 
-func (a *wfeAPI) GetTaskID() uuid.UUID                     { return a.taskID }
-func (a *wfeAPI) GetWorkflowID() uuid.UUID                 { return a.workflowID }
+func (a *wfeAPI) GetTaskID() string                        { return a.taskID }
+func (a *wfeAPI) GetWorkflowID() string                    { return a.workflowID }
 func (a *wfeAPI) GetTaskState() State                      { return InProgress }
 func (a *wfeAPI) GetPluginState() string                   { return a.pluginState }
 func (a *wfeAPI) ReadFromGlobalStore(_ string) (any, bool) { return nil, false }
@@ -60,7 +60,7 @@ func newWFETask(t *testing.T, serverURL string) (*WaitForEventTask, *wfeAPI) {
 	if err != nil {
 		t.Fatalf("NewWaitForEventTask: %v", err)
 	}
-	api := &wfeAPI{taskID: uuid.New(), workflowID: uuid.New()}
+	api := &wfeAPI{taskID: uuid.NewString(), workflowID: uuid.NewString()}
 	task.Init(api)
 	return task, api
 }
@@ -252,7 +252,7 @@ func TestWaitForEventTask_GetRenderInfo_WithDisplay(t *testing.T) {
 
 	task, taskErr := NewWaitForEventTask(raw)
 	require.NoError(t, taskErr)
-	api := &wfeAPI{taskID: uuid.New(), workflowID: uuid.New(), pluginState: string(notifiedService)}
+	api := &wfeAPI{taskID: uuid.NewString(), workflowID: uuid.NewString(), pluginState: string(notifiedService)}
 	task.Init(api)
 
 	resp, err := task.GetRenderInfo(context.Background())
@@ -273,7 +273,7 @@ func TestWaitForEventTask_Start_EmptyURL(t *testing.T) {
 	raw, _ := json.Marshal(WaitForEventConfig{ExternalServiceURL: ""})
 	task, taskErr := NewWaitForEventTask(raw)
 	require.NoError(t, taskErr)
-	api := &wfeAPI{taskID: uuid.New(), workflowID: uuid.New()}
+	api := &wfeAPI{taskID: uuid.NewString(), workflowID: uuid.NewString()}
 	task.Init(api)
 
 	resp, err := task.Start(context.Background())

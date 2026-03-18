@@ -6,7 +6,6 @@ import (
 	"maps"
 	"time"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	workflowmanager "github.com/OpenNSW/nsw/internal/workflow/manager"
@@ -35,7 +34,7 @@ func NewConsignmentService(db *gorm.DB, templateProvider TemplateProvider, workf
 // --- WorkflowEventHandler implementation ---
 
 // OnWorkflowStatusChanged handles workflow lifecycle state propagation to consignment domain state.
-func (s *ConsignmentService) OnWorkflowStatusChanged(_ context.Context, tx *gorm.DB, workflowID uuid.UUID, _ model.WorkflowStatus, toStatus model.WorkflowStatus, _ *model.Workflow) error {
+func (s *ConsignmentService) OnWorkflowStatusChanged(_ context.Context, tx *gorm.DB, workflowID string, _ model.WorkflowStatus, toStatus model.WorkflowStatus, _ *model.Workflow) error {
 	switch toStatus {
 	case model.WorkflowStatusCompleted:
 		return s.markConsignmentAsFinished(tx, workflowID)
@@ -45,7 +44,7 @@ func (s *ConsignmentService) OnWorkflowStatusChanged(_ context.Context, tx *gorm
 }
 
 // CreateConsignmentShell creates a shell consignment (Stage 1: Trader selects CHA). State is INITIALIZED; no workflow nodes.
-func (s *ConsignmentService) CreateConsignmentShell(ctx context.Context, flow model.ConsignmentFlow, chaID uuid.UUID, traderID string) (*model.ConsignmentDetailDTO, error) {
+func (s *ConsignmentService) CreateConsignmentShell(ctx context.Context, flow model.ConsignmentFlow, chaID string, traderID string) (*model.ConsignmentDetailDTO, error) {
 	if traderID == "" {
 		return nil, fmt.Errorf("trader ID cannot be empty")
 	}
@@ -77,7 +76,7 @@ func (s *ConsignmentService) CreateConsignmentShell(ctx context.Context, flow mo
 
 // InitializeConsignmentByID runs Stage 2: CHA selects one or more HS Codes; creates workflow and sets state to IN_PROGRESS.
 // Returns error if consignment is not in INITIALIZED.
-func (s *ConsignmentService) InitializeConsignmentByID(ctx context.Context, consignmentID uuid.UUID, hsCodeIDs []uuid.UUID, globalContext map[string]any) (*model.ConsignmentDetailDTO, error) {
+func (s *ConsignmentService) InitializeConsignmentByID(ctx context.Context, consignmentID string, hsCodeIDs []string, globalContext map[string]any) (*model.ConsignmentDetailDTO, error) {
 	if len(hsCodeIDs) == 0 {
 		return nil, fmt.Errorf("at least one HS code ID is required")
 	}
@@ -235,7 +234,7 @@ func (s *ConsignmentService) initializeConsignmentInTx(ctx context.Context, crea
 }
 
 // GetConsignmentByID retrieves a consignment by its ID from the database.
-func (s *ConsignmentService) GetConsignmentByID(ctx context.Context, consignmentID uuid.UUID) (*model.ConsignmentDetailDTO, error) {
+func (s *ConsignmentService) GetConsignmentByID(ctx context.Context, consignmentID string) (*model.ConsignmentDetailDTO, error) {
 	var consignment model.Consignment
 	result := s.db.WithContext(ctx).First(&consignment, "id = ?", consignmentID)
 	if result.Error != nil {
@@ -329,14 +328,14 @@ func (s *ConsignmentService) listConsignmentsWithBaseQuery(ctx context.Context, 
 	}
 
 	// Collect Consignment IDs to fetch workflow node counts
-	consignmentIDs := make([]uuid.UUID, len(consignments))
+	consignmentIDs := make([]string, len(consignments))
 	for i, c := range consignments {
 		consignmentIDs[i] = c.ID
 	}
 
 	// Fetch workflow node counts in batch (via workflow_id which equals consignment ID)
 	type NodeCounts struct {
-		WorkflowID uuid.UUID
+		WorkflowID string
 		Total      int
 		Completed  int
 	}
@@ -353,15 +352,15 @@ func (s *ConsignmentService) listConsignmentsWithBaseQuery(ctx context.Context, 
 	}
 
 	// Map counts to consignment IDs (workflow_id == consignment_id) for easy lookup
-	countsMap := make(map[uuid.UUID]NodeCounts)
+	countsMap := make(map[string]NodeCounts)
 	for _, nc := range nodeCounts {
 		countsMap[nc.WorkflowID] = nc
 	}
 
 	// Check which consignments have end nodes (via the workflows table)
 	type WorkflowEndNode struct {
-		ID        uuid.UUID
-		EndNodeID *uuid.UUID
+		ID        string
+		EndNodeID *string
 	}
 	var workflowEndNodes []WorkflowEndNode
 	err = s.db.WithContext(ctx).Model(&model.Workflow{}).
@@ -371,7 +370,7 @@ func (s *ConsignmentService) listConsignmentsWithBaseQuery(ctx context.Context, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch workflow end nodes: %w", err)
 	}
-	endNodeMap := make(map[uuid.UUID]bool)
+	endNodeMap := make(map[string]bool)
 	for _, w := range workflowEndNodes {
 		if w.EndNodeID != nil {
 			endNodeMap[w.ID] = true
@@ -509,7 +508,7 @@ func (s *ConsignmentService) UpdateConsignment(ctx context.Context, updateReq *m
 }
 
 // markConsignmentAsFinished updates the consignment state to FINISHED.
-func (s *ConsignmentService) markConsignmentAsFinished(tx *gorm.DB, consignmentID uuid.UUID) error {
+func (s *ConsignmentService) markConsignmentAsFinished(tx *gorm.DB, consignmentID string) error {
 	var consignment model.Consignment
 	if err := tx.First(&consignment, "id = ?", consignmentID).Error; err != nil {
 		return fmt.Errorf("failed to retrieve consignment %s: %w", consignmentID, err)
@@ -524,15 +523,15 @@ func (s *ConsignmentService) markConsignmentAsFinished(tx *gorm.DB, consignmentI
 // hsCodeBatchLoader handles batch loading of HS codes for JSONB items
 type hsCodeBatchLoader struct {
 	db        *gorm.DB
-	hsCodeMap map[uuid.UUID]model.HSCode
-	hsCodeIDs map[uuid.UUID]struct{}
+	hsCodeMap map[string]model.HSCode
+	hsCodeIDs map[string]struct{}
 }
 
 func newHSCodeBatchLoader(db *gorm.DB) *hsCodeBatchLoader {
 	return &hsCodeBatchLoader{
 		db:        db,
-		hsCodeMap: make(map[uuid.UUID]model.HSCode),
-		hsCodeIDs: make(map[uuid.UUID]struct{}),
+		hsCodeMap: make(map[string]model.HSCode),
+		hsCodeIDs: make(map[string]struct{}),
 	}
 }
 
@@ -547,7 +546,7 @@ func (loader *hsCodeBatchLoader) load(ctx context.Context) error {
 		return nil
 	}
 
-	hsCodeIDList := make([]uuid.UUID, 0, len(loader.hsCodeIDs))
+	hsCodeIDList := make([]string, 0, len(loader.hsCodeIDs))
 	for id := range loader.hsCodeIDs {
 		hsCodeIDList = append(hsCodeIDList, id)
 	}
@@ -564,7 +563,7 @@ func (loader *hsCodeBatchLoader) load(ctx context.Context) error {
 	return nil
 }
 
-func (loader *hsCodeBatchLoader) get(id uuid.UUID) (model.HSCode, error) {
+func (loader *hsCodeBatchLoader) get(id string) (model.HSCode, error) {
 	hsCode, exists := loader.hsCodeMap[id]
 	if !exists {
 		return model.HSCode{}, fmt.Errorf("HS code not found for ID %s", id)

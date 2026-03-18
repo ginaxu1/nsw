@@ -42,7 +42,7 @@ func (m *MockTaskStore) Create(taskInfo *persistence.TaskInfo) error {
 	return args.Error(0)
 }
 
-func (m *MockTaskStore) GetByID(id uuid.UUID) (*persistence.TaskInfo, error) {
+func (m *MockTaskStore) GetByID(id string) (*persistence.TaskInfo, error) {
 	args := m.Called(id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -50,12 +50,12 @@ func (m *MockTaskStore) GetByID(id uuid.UUID) (*persistence.TaskInfo, error) {
 	return args.Get(0).(*persistence.TaskInfo), args.Error(1)
 }
 
-func (m *MockTaskStore) UpdateStatus(id uuid.UUID, status *plugin.State) error {
+func (m *MockTaskStore) UpdateStatus(id string, status *plugin.State) error {
 	args := m.Called(id, status)
 	return args.Error(0)
 }
 
-func (m *MockTaskStore) GetByWorkflowID(workflowID uuid.UUID) ([]persistence.TaskInfo, error) {
+func (m *MockTaskStore) GetByWorkflowID(workflowID string) ([]persistence.TaskInfo, error) {
 	args := m.Called(workflowID)
 	return args.Get(0).([]persistence.TaskInfo), args.Error(1)
 }
@@ -65,7 +65,7 @@ func (m *MockTaskStore) Update(taskInfo *persistence.TaskInfo) error {
 	return args.Error(0)
 }
 
-func (m *MockTaskStore) Delete(id uuid.UUID) error {
+func (m *MockTaskStore) Delete(id string) error {
 	args := m.Called(id)
 	return args.Error(0)
 }
@@ -80,22 +80,22 @@ func (m *MockTaskStore) GetByStatus(status plugin.State) ([]persistence.TaskInfo
 	return args.Get(0).([]persistence.TaskInfo), args.Error(1)
 }
 
-func (m *MockTaskStore) UpdateLocalState(id uuid.UUID, localState json.RawMessage) error {
+func (m *MockTaskStore) UpdateLocalState(id string, localState json.RawMessage) error {
 	args := m.Called(id, localState)
 	return args.Error(0)
 }
 
-func (m *MockTaskStore) GetLocalState(id uuid.UUID) (json.RawMessage, error) {
+func (m *MockTaskStore) GetLocalState(id string) (json.RawMessage, error) {
 	args := m.Called(id)
 	return args.Get(0).(json.RawMessage), args.Error(1)
 }
 
-func (m *MockTaskStore) UpdatePluginState(id uuid.UUID, pluginState string) error {
+func (m *MockTaskStore) UpdatePluginState(id string, pluginState string) error {
 	args := m.Called(id, pluginState)
 	return args.Error(0)
 }
 
-func (m *MockTaskStore) GetPluginState(id uuid.UUID) (string, error) {
+func (m *MockTaskStore) GetPluginState(id string) (string, error) {
 	args := m.Called(id)
 	return args.Get(0).(string), args.Error(1)
 }
@@ -155,11 +155,11 @@ func TestInitTask(t *testing.T) {
 	t.Run("Cache Hit", func(t *testing.T) {
 		tm, mockFactory, mockStore, mockPlugin := setupTest(t)
 		ctx := context.Background()
-		taskID := uuid.New()
+		taskID := uuid.NewString()
 		req := InitTaskRequest{
 			TaskID:                 taskID,
-			WorkflowID:             uuid.New(),
-			WorkflowNodeTemplateID: uuid.New(),
+			WorkflowID:             uuid.NewString(),
+			WorkflowNodeTemplateID: uuid.NewString(),
 			Type:                   plugin.TaskTypeSimpleForm,
 			Config:                 json.RawMessage(`{}`),
 			GlobalState:            map[string]any{},
@@ -168,7 +168,7 @@ func TestInitTask(t *testing.T) {
 		// Pre-populate cache
 		mockPlugin.On("Init", mock.Anything).Return().Once()
 
-		container := container.NewContainer(taskID, uuid.New(), uuid.New(), plugin.InProgress, nil, nil, nil, mockPlugin, nil)
+		container := container.NewContainer(taskID, uuid.NewString(), uuid.NewString(), plugin.InProgress, nil, nil, nil, mockPlugin, nil)
 		tm.containerCache.Set(taskID, container)
 
 		// Expect Start to be called on the *existing* container's plugin
@@ -190,11 +190,11 @@ func TestInitTask(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		tm, mockFactory, mockStore, mockPlugin := setupTest(t)
 		ctx := context.Background()
-		taskID := uuid.New()
+		taskID := uuid.NewString()
 		req := InitTaskRequest{
 			TaskID:                 taskID,
-			WorkflowID:             uuid.New(),
-			WorkflowNodeTemplateID: uuid.New(),
+			WorkflowID:             uuid.NewString(),
+			WorkflowNodeTemplateID: uuid.NewString(),
 			Type:                   plugin.TaskTypeSimpleForm,
 			Config:                 json.RawMessage(`{}`),
 			GlobalState:            map[string]any{},
@@ -222,7 +222,7 @@ func TestInitTask(t *testing.T) {
 		tm, mockFactory, _, _ := setupTest(t)
 		ctx := context.Background()
 		req := InitTaskRequest{
-			TaskID: uuid.New(),
+			TaskID: uuid.NewString(),
 			Type:   plugin.TaskTypeSimpleForm,
 			Config: json.RawMessage(`{}`),
 		}
@@ -239,7 +239,7 @@ func TestInitTask(t *testing.T) {
 		tm, mockFactory, mockStore, mockPlugin := setupTest(t)
 		ctx := context.Background()
 		req := InitTaskRequest{
-			TaskID: uuid.New(),
+			TaskID: uuid.NewString(),
 			Type:   plugin.TaskTypeSimpleForm,
 			Config: json.RawMessage(`{}`),
 		}
@@ -264,7 +264,7 @@ func TestInitTask(t *testing.T) {
 		tm, mockFactory, mockStore, mockPlugin := setupTest(t)
 		ctx := context.Background()
 		req := InitTaskRequest{
-			TaskID: uuid.New(),
+			TaskID: uuid.NewString(),
 			Type:   plugin.TaskTypeSimpleForm,
 			Config: json.RawMessage(`{}`),
 		}
@@ -288,8 +288,8 @@ func TestExecuteTask(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		tm, mockFactory, mockStore, mockPlugin := setupTest(t)
 
-		taskID := uuid.New()
-		workflowID := uuid.New()
+		taskID := uuid.NewString()
+		workflowID := uuid.NewString()
 
 		reqBody := ExecuteTaskRequest{
 			WorkflowID: workflowID,
@@ -301,7 +301,7 @@ func TestExecuteTask(t *testing.T) {
 		taskInfo := &persistence.TaskInfo{
 			ID:                     taskID,
 			WorkflowID:             workflowID,
-			WorkflowNodeTemplateID: uuid.New(),
+			WorkflowNodeTemplateID: uuid.NewString(),
 			Type:                   plugin.TaskTypeSimpleForm,
 			Config:                 json.RawMessage(`{}`),
 			GlobalContext:          json.RawMessage(`{}`),
@@ -330,8 +330,8 @@ func TestExecuteTask(t *testing.T) {
 	t.Run("Execute Error", func(t *testing.T) {
 		tm, mockFactory, mockStore, mockPlugin := setupTest(t)
 
-		taskID := uuid.New()
-		workflowID := uuid.New()
+		taskID := uuid.NewString()
+		workflowID := uuid.NewString()
 
 		reqBody := ExecuteTaskRequest{
 			WorkflowID: workflowID,
@@ -378,22 +378,22 @@ func TestNotifyWorkflowManager(t *testing.T) {
 			workflowUpdateHandler: nil,
 		}
 		// Should not panic
-		tm.notifyWorkflowUpdateHandler(context.Background(), uuid.New(), nil, nil, nil, nil)
+		tm.notifyWorkflowUpdateHandler(context.Background(), uuid.NewString(), nil, nil, nil, nil)
 	})
 
 	t.Run("Callback Invoked", func(t *testing.T) {
 		invoked := false
-		var gotTaskID uuid.UUID
+		var gotTaskID string
 		var gotState *plugin.State
 
 		tm := &taskManager{
-			workflowUpdateHandler: func(_ context.Context, taskID uuid.UUID, state *plugin.State, _ *string, _ map[string]any, _ *string) {
+			workflowUpdateHandler: func(_ context.Context, taskID string, state *plugin.State, _ *string, _ map[string]any, _ *string) {
 				invoked = true
 				gotTaskID = taskID
 				gotState = state
 			},
 		}
-		taskID := uuid.New()
+		taskID := uuid.NewString()
 		state := plugin.Completed
 		tm.notifyWorkflowUpdateHandler(context.Background(), taskID, &state, nil, nil, nil)
 
@@ -406,13 +406,13 @@ func TestNotifyWorkflowManager(t *testing.T) {
 func TestGetTask_CacheRebuild(t *testing.T) {
 	t.Run("Cache Hit", func(t *testing.T) {
 		tm, _, _, mockPlugin := setupTest(t)
-		taskID := uuid.New()
+		taskID := uuid.NewString()
 
 		// Expect Init call
 		mockPlugin.On("Init", mock.Anything).Return().Once()
 
 		// Pre-populate cache
-		container := container.NewContainer(taskID, uuid.New(), uuid.New(), plugin.InProgress, nil, nil, nil, mockPlugin, nil)
+		container := container.NewContainer(taskID, uuid.NewString(), uuid.NewString(), plugin.InProgress, nil, nil, nil, mockPlugin, nil)
 		tm.containerCache.Set(taskID, container)
 
 		// Act
@@ -423,8 +423,8 @@ func TestGetTask_CacheRebuild(t *testing.T) {
 
 	t.Run("Cache Miss Rebuild Success", func(t *testing.T) {
 		tm, mockFactory, mockStore, mockPlugin := setupTest(t)
-		taskID := uuid.New()
-		workflowID := uuid.New()
+		taskID := uuid.NewString()
+		workflowID := uuid.NewString()
 
 		// Mock Persistence
 		GlobalContext := json.RawMessage(`{"foo":"bar"}`)
@@ -457,7 +457,7 @@ func TestGetTask_CacheRebuild(t *testing.T) {
 
 	t.Run("Cache Miss Store Error", func(t *testing.T) {
 		tm, _, mockStore, _ := setupTest(t)
-		taskID := uuid.New()
+		taskID := uuid.NewString()
 
 		mockStore.On("GetByID", taskID).Return(nil, errors.New("store error")).Once()
 
@@ -490,9 +490,9 @@ func TestContainerCache(t *testing.T) {
 	t.Run("LRU Eviction", func(t *testing.T) {
 		cache := newContainerCache(2)
 
-		c1 := &container.Container{TaskID: uuid.New()}
-		c2 := &container.Container{TaskID: uuid.New()}
-		c3 := &container.Container{TaskID: uuid.New()}
+		c1 := &container.Container{TaskID: uuid.NewString()}
+		c2 := &container.Container{TaskID: uuid.NewString()}
+		c3 := &container.Container{TaskID: uuid.NewString()}
 
 		cache.Set(c1.TaskID, c1)
 		cache.Set(c2.TaskID, c2)
@@ -516,7 +516,7 @@ func TestContainerCache(t *testing.T) {
 
 	t.Run("Delete", func(t *testing.T) {
 		cache := newContainerCache(10)
-		c1 := &container.Container{TaskID: uuid.New()}
+		c1 := &container.Container{TaskID: uuid.NewString()}
 		cache.Set(c1.TaskID, c1)
 
 		cache.Delete(c1.TaskID)
@@ -527,7 +527,7 @@ func TestContainerCache(t *testing.T) {
 
 	t.Run("Clear", func(t *testing.T) {
 		cache := newContainerCache(10)
-		c1 := &container.Container{TaskID: uuid.New()}
+		c1 := &container.Container{TaskID: uuid.NewString()}
 		cache.Set(c1.TaskID, c1)
 
 		cache.Clear()

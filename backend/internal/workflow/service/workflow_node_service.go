@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	"github.com/OpenNSW/nsw/internal/workflow/model"
@@ -20,7 +19,7 @@ func NewWorkflowNodeService(db *gorm.DB) *WorkflowNodeService {
 }
 
 // GetWorkflowNodeByID retrieves a workflow node by its ID.
-func (s *WorkflowNodeService) GetWorkflowNodeByID(ctx context.Context, nodeID uuid.UUID) (*model.WorkflowNode, error) {
+func (s *WorkflowNodeService) GetWorkflowNodeByID(ctx context.Context, nodeID string) (*model.WorkflowNode, error) {
 	var node model.WorkflowNode
 	result := s.db.WithContext(ctx).Where("id = ?", nodeID).First(&node)
 	if result.Error != nil {
@@ -30,7 +29,7 @@ func (s *WorkflowNodeService) GetWorkflowNodeByID(ctx context.Context, nodeID uu
 }
 
 // GetWorkflowNodeByIDInTx retrieves a workflow node by its ID within a transaction.
-func (s *WorkflowNodeService) GetWorkflowNodeByIDInTx(ctx context.Context, tx *gorm.DB, nodeID uuid.UUID) (*model.WorkflowNode, error) {
+func (s *WorkflowNodeService) GetWorkflowNodeByIDInTx(ctx context.Context, tx *gorm.DB, nodeID string) (*model.WorkflowNode, error) {
 	var node model.WorkflowNode
 	result := tx.WithContext(ctx).Where("id = ?", nodeID).First(&node)
 	if result.Error != nil {
@@ -40,7 +39,7 @@ func (s *WorkflowNodeService) GetWorkflowNodeByIDInTx(ctx context.Context, tx *g
 }
 
 // GetWorkflowNodesByIDsInTx retrieves multiple workflow nodes by their IDs within a transaction.
-func (s *WorkflowNodeService) GetWorkflowNodesByIDsInTx(ctx context.Context, tx *gorm.DB, nodeIDs []uuid.UUID) ([]model.WorkflowNode, error) {
+func (s *WorkflowNodeService) GetWorkflowNodesByIDsInTx(ctx context.Context, tx *gorm.DB, nodeIDs []string) ([]model.WorkflowNode, error) {
 	var nodes []model.WorkflowNode
 	result := tx.WithContext(ctx).Where("id IN ?", nodeIDs).Find(&nodes)
 	if result.Error != nil {
@@ -96,7 +95,7 @@ func (s *WorkflowNodeService) UpdateWorkflowNodesInTx(ctx context.Context, tx *g
 }
 
 // GetWorkflowNodesByWorkflowIDInTx retrieves all workflow nodes associated with a given workflow ID within a transaction.
-func (s *WorkflowNodeService) GetWorkflowNodesByWorkflowIDInTx(ctx context.Context, tx *gorm.DB, workflowID uuid.UUID) ([]model.WorkflowNode, error) {
+func (s *WorkflowNodeService) GetWorkflowNodesByWorkflowIDInTx(ctx context.Context, tx *gorm.DB, workflowID string) ([]model.WorkflowNode, error) {
 	var nodes []model.WorkflowNode
 	result := tx.WithContext(ctx).Where("workflow_id = ?", workflowID).Find(&nodes)
 	if result.Error != nil {
@@ -106,7 +105,7 @@ func (s *WorkflowNodeService) GetWorkflowNodesByWorkflowIDInTx(ctx context.Conte
 }
 
 // GetWorkflowNodesByWorkflowIDsInTx retrieves all workflow nodes associated with multiple workflow IDs within a transaction.
-func (s *WorkflowNodeService) GetWorkflowNodesByWorkflowIDsInTx(ctx context.Context, tx *gorm.DB, workflowIDs []uuid.UUID) ([]model.WorkflowNode, error) {
+func (s *WorkflowNodeService) GetWorkflowNodesByWorkflowIDsInTx(ctx context.Context, tx *gorm.DB, workflowIDs []string) ([]model.WorkflowNode, error) {
 	if len(workflowIDs) == 0 {
 		return []model.WorkflowNode{}, nil
 	}
@@ -120,7 +119,7 @@ func (s *WorkflowNodeService) GetWorkflowNodesByWorkflowIDsInTx(ctx context.Cont
 }
 
 // CountIncompleteNodesByWorkflowID counts the number of incomplete workflow nodes for a given workflow.
-func (s *WorkflowNodeService) CountIncompleteNodesByWorkflowID(ctx context.Context, tx *gorm.DB, workflowID uuid.UUID) (int64, error) {
+func (s *WorkflowNodeService) CountIncompleteNodesByWorkflowID(ctx context.Context, tx *gorm.DB, workflowID string) (int64, error) {
 	var count int64
 	err := tx.WithContext(ctx).
 		Model(&model.WorkflowNode{}).

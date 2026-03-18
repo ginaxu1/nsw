@@ -12,8 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
-
 	"github.com/OpenNSW/nsw/internal/config"
 	"github.com/OpenNSW/nsw/internal/form"
 	"github.com/OpenNSW/nsw/pkg/jsonform"
@@ -432,8 +430,8 @@ func (s *SimpleForm) submitHandler(ctx context.Context, content any) (*Execution
 
 	requestPayload := map[string]any{
 		"data":       formData,
-		"taskId":     s.api.GetTaskID().String(),
-		"workflowId": s.api.GetWorkflowID().String(),
+		"taskId":     s.api.GetTaskID(),
+		"workflowId": s.api.GetWorkflowID(),
 		"serviceUrl": strings.TrimRight(s.cfg.Server.ServiceURL, "/") + TasksAPIPath,
 	}
 	if s.config.Submission != nil && s.config.Submission.Request != nil {
@@ -669,12 +667,7 @@ func (s *SimpleForm) attachFormDisplay(ctx context.Context, content map[string]a
 		}
 		return
 	}
-	id, err := uuid.Parse(formID)
-	if err != nil {
-		slog.Warn("invalid display form ID, expected UUID", "formId", s.config.FormID, "displayFormId", formID, "error", err)
-		return
-	}
-	def, err := s.formService.GetFormByID(ctx, id)
+	def, err := s.formService.GetFormByID(ctx, formID)
 	if err != nil {
 		slog.Warn("failed to fetch display form definition", "formId", s.config.FormID, "displayFormId", formID, "error", err)
 		return
@@ -691,11 +684,7 @@ func (s *SimpleForm) populateFromRegistry(ctx context.Context) error {
 	if s.formService == nil {
 		return fmt.Errorf("form service is required to populate form definition")
 	}
-	formUUID, err := uuid.Parse(s.config.FormID)
-	if err != nil {
-		return fmt.Errorf("invalid form ID format (expected UUID): %w", err)
-	}
-	def, err := s.formService.GetFormByID(ctx, formUUID)
+	def, err := s.formService.GetFormByID(ctx, s.config.FormID)
 	if err != nil {
 		return fmt.Errorf("failed to get form definition for formId %s: %w", s.config.FormID, err)
 	}

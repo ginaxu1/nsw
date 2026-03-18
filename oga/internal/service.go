@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/OpenNSW/nsw/oga/internal/feedback"
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -27,14 +26,14 @@ type OGAService interface {
 	GetApplications(ctx context.Context, status string, page, pageSize int) (*PagedResponse[Application], error)
 
 	// GetApplication returns a specific application by task ID
-	GetApplication(ctx context.Context, taskID uuid.UUID) (*Application, error)
+	GetApplication(ctx context.Context, taskID string) (*Application, error)
 
 	// ReviewApplication approves or rejects an application and sends response back to service
-	ReviewApplication(ctx context.Context, taskID uuid.UUID, reviewerData map[string]any) error
+	ReviewApplication(ctx context.Context, taskID string, reviewerData map[string]any) error
 
 	// FeedbackApplication sends a change-request feedback to the trader via the NSW task API
 	// and updates the application status to FEEDBACK_REQUESTED.
-	FeedbackApplication(ctx context.Context, taskID uuid.UUID, content map[string]any) error
+	FeedbackApplication(ctx context.Context, taskID string, content map[string]any) error
 
 	// Close closes the service and releases resources
 	Close() error
@@ -47,8 +46,8 @@ type Meta struct {
 
 // InjectRequest represents the incoming data from services
 type InjectRequest struct {
-	TaskID             uuid.UUID        `json:"taskId"`
-	WorkflowID         uuid.UUID        `json:"workflowId"`
+	TaskID             string           `json:"taskId"`
+	WorkflowID         string           `json:"workflowId"`
 	Data               map[string]any   `json:"data"`
 	ServiceURL         string           `json:"serviceUrl"` // URL to send response back to
 	Meta               *Meta            `json:"meta,omitempty"`
@@ -57,8 +56,8 @@ type InjectRequest struct {
 
 // Application represents an application for display in the UI
 type Application struct {
-	TaskID          uuid.UUID        `json:"taskId"`
-	WorkflowID      uuid.UUID        `json:"workflowId"`
+	TaskID          string           `json:"taskId"`
+	WorkflowID      string           `json:"workflowId"`
 	ServiceURL      string           `json:"serviceUrl"`
 	Data            map[string]any   `json:"data"`
 	Meta            *Meta            `json:"meta,omitempty"`
@@ -80,9 +79,9 @@ type PagedResponse[T any] struct {
 
 // TaskResponse represents the response sent back to the service
 type TaskResponse struct {
-	TaskID     uuid.UUID `json:"task_id"`
-	WorkflowID uuid.UUID `json:"workflow_id"`
-	Payload    any       `json:"payload"`
+	TaskID     string `json:"task_id"`
+	WorkflowID string `json:"workflow_id"`
+	Payload    any    `json:"payload"`
 }
 
 // metaToJSONB converts a *Meta struct to JSONB via JSON round-trip.
@@ -139,10 +138,10 @@ func NewOGAService(store *ApplicationStore, formStore *FormStore) OGAService {
 // the submitted data and resets the status to PENDING for re-review.
 func (s *ogaService) CreateApplication(ctx context.Context, req *InjectRequest) error {
 	// Validate required fields
-	if req.TaskID == uuid.Nil {
+	if req.TaskID == "" {
 		return fmt.Errorf("taskId is required")
 	}
-	if req.WorkflowID == uuid.Nil {
+	if req.WorkflowID == "" {
 		return fmt.Errorf("workflowId is required")
 	}
 	if req.ServiceURL == "" {
@@ -222,7 +221,7 @@ func (s *ogaService) GetApplications(ctx context.Context, status string, page, p
 }
 
 // GetApplication returns a specific application by task ID
-func (s *ogaService) GetApplication(ctx context.Context, taskID uuid.UUID) (*Application, error) {
+func (s *ogaService) GetApplication(ctx context.Context, taskID string) (*Application, error) {
 	record, err := s.store.GetByTaskID(taskID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -266,7 +265,7 @@ func (s *ogaService) GetApplication(ctx context.Context, taskID uuid.UUID) (*App
 }
 
 // ReviewApplication approves or rejects an application and sends response back to service
-func (s *ogaService) ReviewApplication(ctx context.Context, taskID uuid.UUID, reviewerResponse map[string]any) error {
+func (s *ogaService) ReviewApplication(ctx context.Context, taskID string, reviewerResponse map[string]any) error {
 	// Get the application to retrieve service URL and workflow ID
 	app, err := s.GetApplication(ctx, taskID)
 	if err != nil {
@@ -311,7 +310,7 @@ func (s *ogaService) ReviewApplication(ctx context.Context, taskID uuid.UUID, re
 
 // FeedbackApplication sends OGA feedback to the trader via the NSW task API
 // and appends the entry to the application's feedback history.
-func (s *ogaService) FeedbackApplication(ctx context.Context, taskID uuid.UUID, content map[string]any) error {
+func (s *ogaService) FeedbackApplication(ctx context.Context, taskID string, content map[string]any) error {
 	app, err := s.GetApplication(ctx, taskID)
 	if err != nil {
 		return err

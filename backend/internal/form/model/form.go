@@ -10,18 +10,20 @@ import (
 
 // BaseModel defines the base model structure with common fields for the form package.
 type BaseModel struct {
-	ID        uuid.UUID `gorm:"type:uuid;column:id;not null;primaryKey" json:"id"`
+	ID        string    `gorm:"type:text;column:id;not null;primaryKey" json:"id"`
 	CreatedAt time.Time `gorm:"type:timestamptz;column:created_at;not null" json:"createdAt"`
 	UpdatedAt time.Time `gorm:"type:timestamptz;column:updated_at;not null" json:"updatedAt"`
 }
 
 // BeforeCreate is a GORM hook that is triggered before a new record is created.
 func (base *BaseModel) BeforeCreate(tx *gorm.DB) (err error) {
-	if base.ID == uuid.Nil {
-		base.ID, err = uuid.NewRandom()
+	if base.ID == "" {
+		id, genErr := uuid.NewRandom()
+		err = genErr
 		if err != nil {
 			return
 		}
+		base.ID = id.String()
 	}
 	base.CreatedAt = time.Now().UTC()
 	base.UpdatedAt = time.Now().UTC()
@@ -52,7 +54,7 @@ func (f *Form) TableName() string {
 // FormResponse represents the response structure for form retrieval
 // This is what portals receive - they don't need to know about Task/FormType
 type FormResponse struct {
-	ID       uuid.UUID       `json:"id"`
+	ID       string          `json:"id"`
 	Name     string          `json:"name"`
 	Schema   json.RawMessage `json:"schema"`   // JSON Schema
 	UISchema json.RawMessage `json:"uiSchema"` // UI Schema

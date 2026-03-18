@@ -2,22 +2,20 @@ package plugin
 
 import (
 	"context"
-
-	"github.com/google/uuid"
 )
 
 type TaskInfo struct {
 	Type       Type
 	State      State
-	TaskID     uuid.UUID
-	WorkflowID uuid.UUID
+	TaskID     string
+	WorkflowID string
 }
 
 // API will be implemented by the TaskContainer, which provides controlled access to
 // generic resources and owns all state transitions via the container-level FSM.
 type API interface {
-	GetTaskID() uuid.UUID
-	GetWorkflowID() uuid.UUID
+	GetTaskID() string
+	GetWorkflowID() string
 	GetTaskState() State
 	ReadFromGlobalStore(key string) (any, bool)
 	WriteToLocalStore(key string, value any) error

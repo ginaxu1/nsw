@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	"github.com/OpenNSW/nsw/internal/workflow/model"
@@ -21,7 +20,7 @@ func NewTemplateService(db *gorm.DB) *TemplateService {
 }
 
 // GetWorkflowTemplateByHSCodeIDAndFlow retrieves the workflow template associated with a given HS code and consignment flow.
-func (s *TemplateService) GetWorkflowTemplateByHSCodeIDAndFlow(ctx context.Context, hsCodeID uuid.UUID, flow model.ConsignmentFlow) (*model.WorkflowTemplate, error) {
+func (s *TemplateService) GetWorkflowTemplateByHSCodeIDAndFlow(ctx context.Context, hsCodeID string, flow model.ConsignmentFlow) (*model.WorkflowTemplate, error) {
 	var workflowTemplate model.WorkflowTemplate
 	result := s.db.WithContext(ctx).Table("workflow_templates").
 		Select("workflow_templates.*").
@@ -36,7 +35,7 @@ func (s *TemplateService) GetWorkflowTemplateByHSCodeIDAndFlow(ctx context.Conte
 }
 
 // GetWorkflowTemplateByID retrieves a workflow template by its ID.
-func (s *TemplateService) GetWorkflowTemplateByID(ctx context.Context, id uuid.UUID) (*model.WorkflowTemplate, error) {
+func (s *TemplateService) GetWorkflowTemplateByID(ctx context.Context, id string) (*model.WorkflowTemplate, error) {
 	var workflowTemplate model.WorkflowTemplate
 	result := s.db.WithContext(ctx).First(&workflowTemplate, "id = ?", id)
 	if result.Error != nil {
@@ -46,7 +45,7 @@ func (s *TemplateService) GetWorkflowTemplateByID(ctx context.Context, id uuid.U
 }
 
 // GetWorkflowNodeTemplatesByIDs retrieves workflow node templates by their IDs.
-func (s *TemplateService) GetWorkflowNodeTemplatesByIDs(ctx context.Context, ids []uuid.UUID) ([]model.WorkflowNodeTemplate, error) {
+func (s *TemplateService) GetWorkflowNodeTemplatesByIDs(ctx context.Context, ids []string) ([]model.WorkflowNodeTemplate, error) {
 	var templates []model.WorkflowNodeTemplate
 	result := s.db.WithContext(ctx).Where("id IN ?", ids).Find(&templates)
 	if result.Error != nil {
@@ -56,7 +55,7 @@ func (s *TemplateService) GetWorkflowNodeTemplatesByIDs(ctx context.Context, ids
 }
 
 // GetWorkflowNodeTemplateByID retrieves a workflow node template by its ID.
-func (s *TemplateService) GetWorkflowNodeTemplateByID(ctx context.Context, id uuid.UUID) (*model.WorkflowNodeTemplate, error) {
+func (s *TemplateService) GetWorkflowNodeTemplateByID(ctx context.Context, id string) (*model.WorkflowNodeTemplate, error) {
 	var template model.WorkflowNodeTemplate
 	result := s.db.WithContext(ctx).First(&template, "id = ?", id)
 	if result.Error != nil {

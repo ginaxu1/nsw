@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	"github.com/OpenNSW/nsw/internal/task/plugin"
@@ -13,9 +12,9 @@ import (
 
 // TaskInfo represents a task execution record in the database
 type TaskInfo struct {
-	ID                     uuid.UUID       `gorm:"type:uuid;column:id;not null;primaryKey" json:"id"`
-	WorkflowID             uuid.UUID       `gorm:"type:uuid;column:workflow_id;not null;index" json:"workflowId"`
-	WorkflowNodeTemplateID uuid.UUID       `gorm:"type:uuid;column:workflow_node_template_id;not null" json:"workflowNodeTemplateId"`
+	ID                     string          `gorm:"type:text;column:id;not null;primaryKey" json:"id"`
+	WorkflowID             string          `gorm:"type:text;column:workflow_id;not null;index" json:"workflowId"`
+	WorkflowNodeTemplateID string          `gorm:"type:text;column:workflow_node_template_id;not null" json:"workflowNodeTemplateId"`
 	Type                   plugin.Type     `gorm:"type:varchar(50);column:type;not null" json:"type"`
 	State                  plugin.State    `gorm:"type:varchar(50);column:state;not null" json:"state"`      // Container-level state (lifecycle)
 	PluginState            string          `gorm:"type:varchar(100);column:plugin_state" json:"pluginState"` // Plugin-level state (business logic)
@@ -38,16 +37,16 @@ type TaskStore struct {
 
 type TaskStoreInterface interface {
 	Create(*TaskInfo) error
-	GetByID(uuid.UUID) (*TaskInfo, error)
-	UpdateStatus(uuid.UUID, *plugin.State) error
+	GetByID(string) (*TaskInfo, error)
+	UpdateStatus(string, *plugin.State) error
 	Update(*TaskInfo) error
-	Delete(uuid.UUID) error
+	Delete(string) error
 	GetAll() ([]TaskInfo, error)
 	GetByStatus(plugin.State) ([]TaskInfo, error)
-	UpdateLocalState(uuid.UUID, json.RawMessage) error
-	GetLocalState(uuid.UUID) (json.RawMessage, error)
-	UpdatePluginState(uuid.UUID, string) error
-	GetPluginState(uuid.UUID) (string, error)
+	UpdateLocalState(string, json.RawMessage) error
+	GetLocalState(string) (json.RawMessage, error)
+	UpdatePluginState(string, string) error
+	GetPluginState(string) (string, error)
 }
 
 // NewTaskStore creates a new TaskStore with the provided database connection
@@ -65,7 +64,7 @@ func (s *TaskStore) Create(execution *TaskInfo) error {
 }
 
 // GetByID retrieves a task execution by its ID
-func (s *TaskStore) GetByID(id uuid.UUID) (*TaskInfo, error) {
+func (s *TaskStore) GetByID(id string) (*TaskInfo, error) {
 	var taskRecord TaskInfo
 	if err := s.db.First(&taskRecord, "id = ?", id).Error; err != nil {
 		return nil, err
@@ -74,7 +73,7 @@ func (s *TaskStore) GetByID(id uuid.UUID) (*TaskInfo, error) {
 }
 
 // UpdateStatus updates the status of a task execution
-func (s *TaskStore) UpdateStatus(id uuid.UUID, status *plugin.State) error {
+func (s *TaskStore) UpdateStatus(id string, status *plugin.State) error {
 	return s.db.Model(&TaskInfo{}).Where("id = ?", id).Update("state", &status).Error
 }
 
@@ -84,7 +83,7 @@ func (s *TaskStore) Update(execution *TaskInfo) error {
 }
 
 // Delete removes a task execution record
-func (s *TaskStore) Delete(id uuid.UUID) error {
+func (s *TaskStore) Delete(id string) error {
 	return s.db.Delete(&TaskInfo{}, "id = ?", id).Error
 }
 
@@ -107,12 +106,12 @@ func (s *TaskStore) GetByStatus(status plugin.State) ([]TaskInfo, error) {
 }
 
 // UpdateLocalState updates the local state of a task execution
-func (s *TaskStore) UpdateLocalState(id uuid.UUID, localState json.RawMessage) error {
+func (s *TaskStore) UpdateLocalState(id string, localState json.RawMessage) error {
 	return s.db.Model(&TaskInfo{}).Where("id = ?", id).Update("local_state", localState).Error
 }
 
 // GetLocalState retrieves the local state of a task execution
-func (s *TaskStore) GetLocalState(id uuid.UUID) (json.RawMessage, error) {
+func (s *TaskStore) GetLocalState(id string) (json.RawMessage, error) {
 	var taskInfo TaskInfo
 	if err := s.db.Select("local_state").First(&taskInfo, "id = ?", id).Error; err != nil {
 		return nil, err
@@ -121,12 +120,12 @@ func (s *TaskStore) GetLocalState(id uuid.UUID) (json.RawMessage, error) {
 }
 
 // UpdatePluginState updates the plugin state of a task execution
-func (s *TaskStore) UpdatePluginState(id uuid.UUID, pluginState string) error {
+func (s *TaskStore) UpdatePluginState(id string, pluginState string) error {
 	return s.db.Model(&TaskInfo{}).Where("id = ?", id).Update("plugin_state", pluginState).Error
 }
 
 // GetPluginState retrieves the plugin state of a task execution
-func (s *TaskStore) GetPluginState(id uuid.UUID) (string, error) {
+func (s *TaskStore) GetPluginState(id string) (string, error) {
 	var taskInfo TaskInfo
 	if err := s.db.Select("plugin_state").First(&taskInfo, "id = ?", id).Error; err != nil {
 		return "", err
