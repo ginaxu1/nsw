@@ -185,6 +185,19 @@ func (c *Config) Validate() error {
 	if c.Auth.ClientID == "" {
 		return fmt.Errorf("AUTH_CLIENT_ID is required")
 	}
+
+	// Payment: when not in mock mode, require production secrets
+	if !c.Payment.MockMode {
+		if c.Payment.Secret == "" {
+			return fmt.Errorf("GOVPAY_SECRET is required when GOVPAY_MOCK_MODE is false")
+		}
+		if c.Payment.MerchantID == "" {
+			return fmt.Errorf("GOVPAY_MERCHANT_ID is required when GOVPAY_MOCK_MODE is false")
+		}
+		if c.Payment.InquiryAPIKey == "" {
+			return fmt.Errorf("GOVPAY_INQUIRY_API_KEY is required when GOVPAY_MOCK_MODE is false")
+		}
+	}
 	return nil
 }
 

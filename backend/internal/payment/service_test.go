@@ -141,7 +141,7 @@ func TestProcessCallback_SecureVerificationFlow(t *testing.T) {
 
 	// ExecuteTask
 	tm.On("ExecuteTask", ctx, manager.ExecuteTaskRequest{
-		TaskID:  taskID,
+		TaskID:  taskID.String(),
 		Payload: &plugin.ExecutionRequest{Action: plugin.PaymentActionSuccess},
 	}).Return(&plugin.ExecutionResponse{}, nil)
 

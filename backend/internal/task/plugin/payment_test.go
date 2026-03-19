@@ -90,12 +90,12 @@ func TestNewPaymentFSM(t *testing.T) {
 
 func TestNewPaymentTask(t *testing.T) {
 	t.Run("ValidConfig", func(t *testing.T) {
-		cfg := `{"amount": 100.50, "currency": "USD", "gateway": "https://pay.example.com", "ttl": 300}`
+		cfg := `{"amount": 100.50, "currency": "USD", "gatewayId": "mock", "ttl": 300}`
 		task, err := NewPaymentTask(json.RawMessage(cfg), &config.Config{}, nil, &gateway.MockGateway{})
 		assert.NoError(t, err)
 		assert.Equal(t, 100.50, task.config.Amount)
 		assert.Equal(t, "USD", task.config.Currency)
-		assert.Equal(t, "https://pay.example.com", task.config.Gateway)
+		assert.Equal(t, "mock", task.config.GatewayID)
 		assert.Equal(t, 300, task.config.TTL)
 	})
 
@@ -116,7 +116,7 @@ func TestPaymentStart(t *testing.T) {
 
 		mockAPI.On("CanTransition", FSMActionStart).Return(true).Once()
 
-		mockAPI.On("GetTaskID").Return(uuid.New()).Once()
+		mockAPI.On("GetTaskID").Return(uuid.New().String()).Once()
 		dbMock.ExpectBegin()
 		dbMock.ExpectExec("INSERT INTO \"payment_transactions\"").WillReturnResult(sqlmock.NewResult(1, 1))
 		dbMock.ExpectCommit()
@@ -165,7 +165,7 @@ func TestPaymentStart(t *testing.T) {
 
 		mockAPI.On("CanTransition", FSMActionStart).Return(true).Once()
 
-		mockAPI.On("GetTaskID").Return(uuid.New()).Once()
+		mockAPI.On("GetTaskID").Return(uuid.New().String()).Once()
 		dbMock.ExpectBegin()
 		dbMock.ExpectExec("INSERT INTO \"payment_transactions\"").WillReturnResult(sqlmock.NewResult(1, 1))
 		dbMock.ExpectCommit()
@@ -188,7 +188,7 @@ func TestPaymentStart(t *testing.T) {
 
 		mockAPI.On("CanTransition", FSMActionStart).Return(true).Once()
 
-		mockAPI.On("GetTaskID").Return(uuid.New()).Once()
+		mockAPI.On("GetTaskID").Return(uuid.New().String()).Once()
 		dbMock.ExpectBegin()
 		dbMock.ExpectExec("INSERT INTO \"payment_transactions\"").WillReturnResult(sqlmock.NewResult(1, 1))
 		dbMock.ExpectCommit()
@@ -285,7 +285,7 @@ func TestPaymentGetRenderInfo_SessionRotation(t *testing.T) {
 	mockAPI.On("ReadFromLocalStore", paymentStoreSession).Return(&expiredSession, nil)
 
 	// Session rotation calls createTransactionRecord
-	mockAPI.On("GetTaskID").Return(uuid.New()).Once()
+	mockAPI.On("GetTaskID").Return(uuid.New().String()).Once()
 	dbMock.ExpectBegin()
 	dbMock.ExpectExec("INSERT INTO \"payment_transactions\"").WillReturnResult(sqlmock.NewResult(1, 1))
 	dbMock.ExpectCommit()
@@ -333,7 +333,7 @@ func TestPaymentGetRenderInfo_TimeoutTransition(t *testing.T) {
 		mockAPI.On("Transition", paymentFSMTimeout).Return(nil).Once()
 
 		// Session rotation calls createTransactionRecord
-		mockAPI.On("GetTaskID").Return(uuid.New()).Once()
+		mockAPI.On("GetTaskID").Return(uuid.New().String()).Once()
 		dbMock.ExpectBegin()
 		dbMock.ExpectExec("INSERT INTO \"payment_transactions\"").WillReturnResult(sqlmock.NewResult(1, 1))
 		dbMock.ExpectCommit()
@@ -397,6 +397,7 @@ func TestPaymentExecute_InitiatePayment(t *testing.T) {
 			GeneratedAt:   time.Now(), // fresh session
 		}
 
+		mockAPI.On("GetPluginState").Return(string(paymentIdle)).Once()
 		mockAPI.On("CanTransition", PaymentActionInitiate).Return(true).Once()
 		mockAPI.On("ReadFromLocalStore", paymentStoreSession).Return(&session, nil).Once()
 
@@ -441,6 +442,7 @@ func TestPaymentExecute_InitiatePayment(t *testing.T) {
 			GeneratedAt:   time.Now().Add(-10 * time.Minute), // well past 5m TTL
 		}
 
+		mockAPI.On("GetPluginState").Return(string(paymentIdle)).Once()
 		mockAPI.On("CanTransition", PaymentActionInitiate).Return(true).Once()
 
 		// Expect record creation during initiation
@@ -467,6 +469,7 @@ func TestPaymentExecute_InitiatePayment(t *testing.T) {
 		task, _ := newTestPaymentTask()
 		task.Init(mockAPI)
 
+		mockAPI.On("GetPluginState").Return(string(paymentInProgress)).Once()
 		mockAPI.On("CanTransition", PaymentActionInitiate).Return(false).Once()
 
 		req := &ExecutionRequest{
@@ -549,7 +552,7 @@ func TestPaymentExecute_PaymentFailed(t *testing.T) {
 		mockAPI.On("CanTransition", PaymentActionFailed).Return(true).Once()
 
 		// Expect new record creation for retry
-		mockAPI.On("GetTaskID").Return(uuid.New()).Once()
+		mockAPI.On("GetTaskID").Return(uuid.New().String()).Once()
 		dbMock.ExpectBegin()
 		dbMock.ExpectExec("INSERT INTO \"payment_transactions\"").WillReturnResult(sqlmock.NewResult(1, 1))
 		dbMock.ExpectCommit()
@@ -575,7 +578,7 @@ func TestPaymentExecute_PaymentFailed(t *testing.T) {
 		task.Init(mockAPI)
 
 		mockAPI.On("CanTransition", PaymentActionFailed).Return(true).Once()
-		mockAPI.On("GetTaskID").Return(uuid.New()).Once()
+		mockAPI.On("GetTaskID").Return(uuid.New().String()).Once()
 		dbMock.ExpectBegin()
 		dbMock.ExpectExec("INSERT INTO \"payment_transactions\"").WillReturnResult(sqlmock.NewResult(1, 1))
 		dbMock.ExpectCommit()
@@ -715,10 +718,10 @@ func newTestPaymentTask() (*PaymentTask, sqlmock.Sqlmock) {
 
 	return &PaymentTask{
 		config: PaymentConfig{
-			Amount:   100.0,
-			Currency: "USD",
-			Gateway:  "https://pay.example.com",
-			TTL:      300, // 5 minutes
+			Amount:    100.0,
+			Currency:  "USD",
+			GatewayID: "mock",
+			TTL:       300, // 5 minutes
 		},
 		appConfig: &config.Config{},
 		repo:      &testPaymentRepo{db: gdb},

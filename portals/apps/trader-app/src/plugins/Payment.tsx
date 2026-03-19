@@ -22,7 +22,7 @@ export default function Payment(props: {
   const [isInitiating, setIsInitiating] = useState(false)
   const [isPopupOpen, setIsPopupOpen] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
-  
+
   // Check for errors returned via query params after failed mock/real gateway
   const urlParams = new URLSearchParams(window.location.search);
   const paymentError = urlParams.has('payment_error');
@@ -39,7 +39,6 @@ export default function Payment(props: {
   const amount = props.configs?.amount ?? 0
   const currency = props.configs?.currency ?? ""
 
-  // --- INITIATE LOGIC ---
   const handlePayNow = async (method: 'CARD') => {
     if (!workflowId || !taskId) return;
     setIsInitiating(true);

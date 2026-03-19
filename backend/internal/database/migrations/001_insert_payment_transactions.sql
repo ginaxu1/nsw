@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS payment_transactions (
         CONSTRAINT payment_transactions_status_check
             CHECK ((status)::text = ANY ((ARRAY['PENDING'::character varying, 'COMPLETED'::character varying, 'FAILED'::character varying])::text[])),
     amount numeric(15, 2) NOT NULL,
+    currency varchar(10) NOT NULL DEFAULT 'LKR',
+    payer_name varchar(255),
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );

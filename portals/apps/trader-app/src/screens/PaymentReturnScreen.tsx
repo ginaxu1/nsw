@@ -23,9 +23,9 @@ export function PaymentReturnScreen() {
         if (updatedInfo.pluginState === "COMPLETED") {
           clearInterval(intervalId);
           // Navigate back to the task, could be standalone consignment or preconsignment
-	  // Assuming generic fallback link if type is unknown, or we can check the path structure
-	  // `workflowId` is typically consignmentId. Since we don't know if it's pre / standard, we just
-	  // use consignments. The user can navigate manually or we can provide a safe back-link.
+          // Assuming generic fallback link if type is unknown, or we can check the path structure
+          // `workflowId` is typically consignmentId. Since we don't know if it's pre / standard, we just
+          // use consignments. The user can navigate manually or we can provide a safe back-link.
           navigate(`/consignments/${workflowId}/tasks/${taskId}`);
         } else if (updatedInfo.pluginState === "IDLE") {
           clearInterval(intervalId);

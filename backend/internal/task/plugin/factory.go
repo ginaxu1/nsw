@@ -49,11 +49,18 @@ func (f *taskFactory) BuildExecutor(ctx context.Context, taskType Type, config j
 		p, err := NewWaitForEventTask(config)
 		return Executor{Plugin: p, FSM: NewWaitForEventFSM()}, err
 	case TaskTypePayment:
-		// Extract gateway from config if possible, else default to govpay or mock
-		// For now, we use a simple logic: if mock mode is on, use mock gateway.
-		gwID := "govpay"
-		if f.config.Payment.MockMode {
-			gwID = "mock"
+		// Determine gateway: prefer task-level config, fall back to global defaults.
+		var partial struct {
+			GatewayID string `json:"gatewayId"`
+		}
+		_ = json.Unmarshal(config, &partial) // best-effort; zero value is fine
+
+		gwID := partial.GatewayID
+		if gwID == "" {
+			gwID = "govpay"
+			if f.config.Payment.MockMode {
+				gwID = "mock"
+			}
 		}
 		gw, err := f.gateways.Get(gwID)
 		if err != nil {

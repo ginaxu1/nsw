@@ -102,9 +102,9 @@ func (s *service) ProcessCallback(ctx context.Context, provider string, r *http.
 			return nil
 		}
 
-		dbStatus := "COMPLETED"
-		if result.Status == "FAILED" {
-			dbStatus = "FAILED"
+		dbStatus := "FAILED"
+		if result.Status == "SUCCESS" {
+			dbStatus = "COMPLETED"
 		}
 		if err := tx.Model(&transaction).Update("status", dbStatus).Error; err != nil {
 			return err
@@ -123,7 +123,7 @@ func (s *service) ProcessCallback(ctx context.Context, provider string, r *http.
 
 	// Now that our local state is durable, notify the Task Manager
 	_, err = s.tm.ExecuteTask(ctx, taskManager.ExecuteTaskRequest{
-		TaskID:  taskID,
+		TaskID:  taskID.String(),
 		Payload: &plugin.ExecutionRequest{Action: action},
 	})
 	return err

@@ -49,10 +49,10 @@ const (
 
 // PaymentConfig holds the task-level configuration supplied at workflow definition time.
 type PaymentConfig struct {
-	Amount   float64 `json:"amount"`   // Amount to be paid
-	Currency string  `json:"currency"` // Currency of the payment (e.g. "USD")
-	Gateway  string  `json:"gateway"`  // Base URL of the payment gateway
-	TTL      int     `json:"ttl"`      // Time-to-live for a payment session in seconds
+	Amount    float64 `json:"amount"`    // Amount to be paid
+	Currency  string  `json:"currency"`  // Currency of the payment (e.g. "LKR")
+	GatewayID string  `json:"gatewayId"` // Gateway provider ID (e.g. "govpay", "stripe"). Resolved from the registry at build time.
+	TTL       int     `json:"ttl"`       // Time-to-live for a payment session in seconds
 }
 
 // PaymentSession is the current active payment session persisted in local store.
@@ -257,6 +257,14 @@ func (t *PaymentTask) Execute(ctx context.Context, request *ExecutionRequest) (*
 
 // ── Handlers ──────────────────────────────────────────────────────────────────
 func (t *PaymentTask) initiateHandler(ctx context.Context, content any) (*ExecutionResponse, error) {
+	// Auto-bootstrap: if the task was never started (pluginState is ""), run Start() first
+	// to move it to IDLE so that INITIATE_PAYMENT becomes a valid transition.
+	if t.api.GetPluginState() == "" && t.api.CanTransition(FSMActionStart) {
+		if _, err := t.Start(ctx); err != nil {
+			return nil, fmt.Errorf("payment: auto-bootstrap failed: %w", err)
+		}
+	}
+
 	if !t.api.CanTransition(PaymentActionInitiate) {
 		return nil, fmt.Errorf("payment: action %q not permitted", PaymentActionInitiate)
 	}
