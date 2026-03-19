@@ -36,7 +36,7 @@ func main() {
 	}
 
 	// Initialize OGA service
-	service := internal.NewOGAService(store, formStore)
+	service := internal.NewOGAService(cfg, store, formStore)
 	defer func() {
 		if err := service.Close(); err != nil {
 			slog.Error("failed to close service", "error", err)
