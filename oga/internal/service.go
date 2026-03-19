@@ -390,7 +390,9 @@ func (s *ogaService) sendToService(ctx context.Context, serviceURL string, respo
 	if err != nil {
 		return fmt.Errorf("failed to execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("service returned status code %d", resp.StatusCode)
