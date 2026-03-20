@@ -23,22 +23,13 @@ WORKDIR /app
 COPY --from=builder /out/oga /app/oga
 COPY --from=builder /app/data/forms /app/data/forms
 
-# Database settings
-ENV OGA_DB_DRIVER=sqlite
-ENV OGA_DB_PATH=/data/oga_applications.db
-ENV OGA_DB_HOST=localhost
-ENV OGA_DB_PORT=5432
-ENV OGA_DB_USER=postgres
-ENV OGA_DB_PASSWORD=changeme
-ENV OGA_DB_NAME=oga_db
-ENV OGA_DB_SSLMODE=disable
-
+# Runtime settings
 USER appuser
 
 # Default port (override via OGA_PORT env var)
 EXPOSE 8081
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget -qO- http://localhost:${OGA_PORT:-8081}/health || exit 1
+  CMD wget -qO- http://localhost:8081/health || exit 1
 
 CMD ["/app/oga"]

@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"gorm.io/driver/postgres"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -70,24 +68,12 @@ type ApplicationStore struct {
 
 // NewApplicationStore creates a new ApplicationStore with configured database
 func NewApplicationStore(cfg Config) (*ApplicationStore, error) {
-	var dialector gorm.Dialector
-
-	switch cfg.DBDriver {
-	case "postgres":
-		dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-			cfg.DBHost, cfg.DBPort, cfg.DBUser, cfg.DBPassword, cfg.DBName, cfg.DBSSLMode)
-		dialector = postgres.Open(dsn)
-	case "sqlite":
-		dbPath := cfg.DBPath
-		if dbPath == "" {
-			dbPath = "oga_applications.db"
-		}
-		dialector = sqlite.Open(dbPath)
-	default:
-		return nil, fmt.Errorf("unsupported database driver: %s", cfg.DBDriver)
+	connector, err := NewDBConnector(cfg)
+	if err != nil {
+		return nil, err
 	}
 
-	db, err := gorm.Open(dialector, &gorm.Config{})
+	db, err := connector.Open()
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
