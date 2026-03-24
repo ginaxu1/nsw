@@ -45,11 +45,11 @@ const defaultJWKSCacheTTL = 5 * time.Minute
 // TokenExtractor handles token extraction and parsing from HTTP headers.
 // It validates JWT signatures using JWKS and maps the `sub` claim to TraderID.
 type TokenExtractor struct {
-	jwksURL          string
-	issuer           string
-	audience         string
-	expectedClientID string
-	httpClient       *http.Client
+	jwksURL           string
+	issuer            string
+	expectedAudiences []string
+	expectedClientIDs []string
+	httpClient        *http.Client
 
 	cacheMu       sync.RWMutex
 	cachedJWKS    *jwksResponse
@@ -57,13 +57,13 @@ type TokenExtractor struct {
 	jwksCacheTTL  time.Duration
 }
 
-func NewTokenExtractor(jwksURL, issuer, audience, expectedClientID string) (*TokenExtractor, error) {
+func NewTokenExtractor(jwksURL, issuer string, audiences, expectedClientIDs []string) (*TokenExtractor, error) {
 	extractor := &TokenExtractor{
-		jwksURL:          strings.TrimSpace(jwksURL),
-		issuer:           strings.TrimSpace(issuer),
-		audience:         strings.TrimSpace(audience),
-		expectedClientID: strings.TrimSpace(expectedClientID),
-		jwksCacheTTL:     defaultJWKSCacheTTL,
+		jwksURL:           strings.TrimSpace(jwksURL),
+		issuer:            strings.TrimSpace(issuer),
+		expectedAudiences: audiences,
+		expectedClientIDs: expectedClientIDs,
+		jwksCacheTTL:      defaultJWKSCacheTTL,
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
@@ -76,18 +76,18 @@ func NewTokenExtractor(jwksURL, issuer, audience, expectedClientID string) (*Tok
 	return extractor, nil
 }
 
-func NewTokenExtractorWithClient(jwksURL, issuer, audience, expectedClientID string, httpClient *http.Client) (*TokenExtractor, error) {
+func NewTokenExtractorWithClient(jwksURL, issuer string, audiences, expectedClientIDs []string, httpClient *http.Client) (*TokenExtractor, error) {
 	if httpClient == nil {
-		return NewTokenExtractor(jwksURL, issuer, audience, expectedClientID)
+		return NewTokenExtractor(jwksURL, issuer, audiences, expectedClientIDs)
 	}
 
 	extractor := &TokenExtractor{
-		jwksURL:          strings.TrimSpace(jwksURL),
-		issuer:           strings.TrimSpace(issuer),
-		audience:         strings.TrimSpace(audience),
-		expectedClientID: strings.TrimSpace(expectedClientID),
-		jwksCacheTTL:     defaultJWKSCacheTTL,
-		httpClient:       httpClient,
+		jwksURL:           strings.TrimSpace(jwksURL),
+		issuer:            strings.TrimSpace(issuer),
+		expectedAudiences: audiences,
+		expectedClientIDs: expectedClientIDs,
+		jwksCacheTTL:      defaultJWKSCacheTTL,
+		httpClient:        httpClient,
 	}
 
 	if err := extractor.validateConfig(); err != nil {
@@ -104,11 +104,11 @@ func (te *TokenExtractor) validateConfig() error {
 	if te.issuer == "" {
 		return fmt.Errorf("issuer is not configured")
 	}
-	if te.audience == "" {
-		return fmt.Errorf("audience is not configured")
+	if len(te.expectedAudiences) == 0 {
+		return fmt.Errorf("audiences are not configured")
 	}
-	if te.expectedClientID == "" {
-		return fmt.Errorf("client id is not configured")
+	if len(te.expectedClientIDs) == 0 {
+		return fmt.Errorf("client ids are not configured")
 	}
 	if te.httpClient == nil {
 		return fmt.Errorf("http client is not configured")
@@ -137,7 +137,6 @@ func (te *TokenExtractor) ExtractClaimsFromHeader(authHeader string) (*Extracted
 	parsedToken, err := jwt.ParseWithClaims(tokenString, claims, te.keyFunc,
 		jwt.WithValidMethods([]string{"RS256", "RS384", "RS512"}),
 		jwt.WithIssuer(te.issuer),
-		jwt.WithAudience(te.audience),
 		jwt.WithLeeway(30*time.Second),
 	)
 	if err != nil {
@@ -145,6 +144,27 @@ func (te *TokenExtractor) ExtractClaimsFromHeader(authHeader string) (*Extracted
 	}
 	if !parsedToken.Valid {
 		return nil, fmt.Errorf("invalid jwt token")
+	}
+
+	// Manual audience validation
+	auds, err := claims.GetAudience()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get audience from jwt: %w", err)
+	}
+	audFound := false
+	for _, aud := range auds {
+		for _, expected := range te.expectedAudiences {
+			if aud == expected {
+				audFound = true
+				break
+			}
+		}
+		if audFound {
+			break
+		}
+	}
+	if !audFound {
+		return nil, fmt.Errorf("jwt audience %v does not match any expected audience", auds)
 	}
 
 	if claims.ExpiresAt == nil {
@@ -159,8 +179,17 @@ func (te *TokenExtractor) ExtractClaimsFromHeader(authHeader string) (*Extracted
 	if strings.TrimSpace(claims.ClientID) == "" {
 		return nil, fmt.Errorf("jwt missing client_id claim")
 	}
-	if strings.TrimSpace(claims.ClientID) != te.expectedClientID {
-		return nil, fmt.Errorf("jwt client_id does not match expected client id")
+
+	clientID := strings.TrimSpace(claims.ClientID)
+	clientFound := false
+	for _, expected := range te.expectedClientIDs {
+		if clientID == expected {
+			clientFound = true
+			break
+		}
+	}
+	if !clientFound {
+		return nil, fmt.Errorf("jwt client_id %s does not match any expected client id", clientID)
 	}
 
 	return &ExtractedClaims{

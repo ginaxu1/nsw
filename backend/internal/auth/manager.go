@@ -51,7 +51,11 @@ func NewManager(db *gorm.DB, authConfig config.AuthConfig) (*Manager, error) {
 	}
 
 	tokenExtractor, err := NewTokenExtractorWithClient(
-		authConfig.JWKSURL, authConfig.Issuer, authConfig.Audience, authConfig.ClientID, httpClient,
+		authConfig.JWKSURL,
+		authConfig.Issuer,
+		[]string{authConfig.Audience, "OGA_PORTAL_APP_NPQS", "OGA_PORTAL_APP_FCAU", "OGA_PORTAL_APP_IRD"},
+		[]string{authConfig.ClientID, "OGA_PORTAL_APP_NPQS", "OGA_PORTAL_APP_FCAU", "OGA_PORTAL_APP_IRD"},
+		httpClient,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize token extractor: %w", err)
