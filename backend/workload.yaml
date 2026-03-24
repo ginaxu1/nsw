@@ -12,7 +12,16 @@ endpoints:
       - external
 
 configurations:
+  files:
+    - name: services.json
+      mountPath: /app/configs/mounted/services.json
+      valueFrom:
+        secretKeyRef:
+          name: services-config
+          key: services.json
   env:
+    - name: SERVICES_CONFIG_PATH
+      value: "/app/configs/mounted/services.json"
     # Database
     - name: DB_HOST
       valueFrom:
