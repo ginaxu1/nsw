@@ -31,18 +31,30 @@ export async function uploadFile(apiClient: ApiClient, file: File): Promise<Uplo
   return { key: meta.key, name: meta.name }
 }
 
-export async function getDownloadUrl(apiClient: ApiClient, key: string): Promise<{ url: string; expiresAt: number }> {
-  const response = await fetch(`${API_BASE_URL}/uploads/${key}`, {
+export async function viewFile(apiClient: ApiClient, key: string): Promise<string> {
+  // Get the target download URL from the backend
+  const res = await fetch(`${API_BASE_URL}/uploads/${key}`, {
     headers: await apiClient.getAuthHeaders(false),
   })
+  if (!res.ok) throw new Error('Failed to get download URL')
+  const data = (await res.json()) as { download_url: string }
 
-  if (!response.ok) {
-    throw new Error(`Failed to get download URL: ${response.status} ${response.statusText}`)
-  }
-
-  const data = (await response.json()) as { download_url: string; expires_at: number }
-  const url = data.download_url.startsWith('/')
+  const isLocal = data.download_url.startsWith('/')
+  const targetUrl = isLocal
     ? `${new URL(API_BASE_URL).origin}${data.download_url}`
     : data.download_url
-  return { url, expiresAt: data.expires_at }
+
+  // Only attach auth headers if accessing the local API endpoint
+  const headers = isLocal ? await apiClient.getAuthHeaders(false) : undefined
+
+  // Fetch the actual file blob securely, optionally attaching auth headers
+  const fileRes = await fetch(targetUrl, { headers })
+
+  if (!fileRes.ok) {
+    throw new Error('Failed to download file content')
+  }
+
+  // Create a local browser Blob URL
+  const blob = await fileRes.blob()
+  return URL.createObjectURL(blob)
 }

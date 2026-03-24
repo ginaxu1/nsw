@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-var storageKeyRx = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}(\.[a-zA-Z0-9]+)?$`)
+var storageKeyRx = regexp.MustCompile(`^[a-zA-Z0-9_\-][a-zA-Z0-9_.-]*(\/[a-zA-Z0-9_\-][a-zA-Z0-9_.-]*)*$`)
 
 // OGAHandler handles HTTP requests for OGA portal operations
 type OGAHandler struct {

@@ -31,9 +31,13 @@ func TestDownloadContent_LocalDriver_Success(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/uploads/"+key+"/content", nil)
 	req.SetPathValue("key", key)
+	ctxAuth := withAuthContext(req.Context(), &auth.AuthContext{
+		UserID: "trader-1", UserContext: &auth.UserContext{UserID: "trader-1"},
+	})
+	req = req.WithContext(ctxAuth)
 	rec := httptest.NewRecorder()
 
-	// No auth context set — should still succeed because this endpoint is intended to be public.
+	// Auth context is now required for download content.
 	handler.DownloadContent(rec, req)
 
 	if rec.Code != http.StatusOK {

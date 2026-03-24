@@ -10,16 +10,11 @@ export interface UploadResponse {
 }
 
 export type UploadHandler = (file: File) => Promise<UploadResponse>;
-export interface DownloadUrlResult {
-  url: string;
-  expiresAt: number;
-}
-
-export type GetDownloadUrl = (key: string) => Promise<DownloadUrlResult>;
+export type ViewFileHandler = (key: string) => Promise<string>;
 
 export interface UploadContextValue {
   onUpload?: UploadHandler;
-  getDownloadUrl?: GetDownloadUrl;
+  viewFile?: ViewFileHandler;
 }
 
 const UploadContext = createContext<UploadContextValue | null>(null);
@@ -27,13 +22,13 @@ const UploadContext = createContext<UploadContextValue | null>(null);
 export function UploadProvider({
   children,
   onUpload,
-  getDownloadUrl,
+  viewFile,
 }: {
   children: ReactNode;
   onUpload?: UploadHandler;
-  getDownloadUrl?: GetDownloadUrl;
+  viewFile?: ViewFileHandler;
 }) {
-  const value: UploadContextValue = { onUpload, getDownloadUrl };
+  const value: UploadContextValue = { onUpload, viewFile };
   return (
     <UploadContext.Provider value={value}>
       {children}
