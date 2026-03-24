@@ -17,7 +17,7 @@ configurations:
       mountPath: /app/configs/mounted/services.json
       valueFrom:
         secretKeyRef:
-          name: services-config
+          name: services-config  
           key: services.json
   env:
     - name: SERVICES_CONFIG_PATH
@@ -73,4 +73,4 @@ configurations:
     - name: STORAGE_LOCAL_BASE_DIR
       value: /data/uploads
     - name: STORAGE_LOCAL_PUBLIC_URL
-      value: /bucket
+      value: /bucket   
