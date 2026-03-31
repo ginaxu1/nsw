@@ -180,10 +180,19 @@ VALUES
             },
             "callback": {
                 "response": {
+                    "display": {
+                        "formId": "95d7e7fe-5be0-43cb-ac71-94bc70d3a01d"
+                    },
                     "mapping": {
-                        "reviewedAt": "gi:health_cert:meta:reviewedAt",
-                        "reviewerNotes": "gi:health_cert:meta:reviewNotes",
+                        "remarks": "gi:health_cert:meta:reviewNotes",
                         "referenceNumber": "gi:health_cert:meta:referenceNumber"
+                    }
+                },
+                "transition": {
+                    "field": "decision",
+                    "default": "OGA_VERIFICATION_REJECTED",
+                    "mapping": {
+                        "APPROVED": "OGA_VERIFICATION_APPROVED"
                     }
                 }
             }
