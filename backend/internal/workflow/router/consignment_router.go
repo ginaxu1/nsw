@@ -63,8 +63,7 @@ func (c *ConsignmentRouter) HandleGetConsignments(w http.ResponseWriter, r *http
 		return
 	}
 
-	// TODO: Replace manual query param role-switching with claims-based RBAC
-	// once the auth provider supports custom role/profile claims.
+	// TODO: Proper AuthZ need to be implemented.
 	role := r.URL.Query().Get("role")
 	if role == "" {
 		role = "trader"
@@ -92,18 +91,12 @@ func (c *ConsignmentRouter) HandleGetConsignments(w http.ResponseWriter, r *http
 	// Role-Based Identity Resolution
 	switch role {
 	case "cha":
-		// Check if UI sent a specific ID to filter by
-		if chaIDStr := r.URL.Query().Get("cha_id"); chaIDStr != "" {
-			filter.ChaID = &chaIDStr
-		} else {
-			// Fallback: Default to the user's own profile if no specific ID requested
-			cha, err := c.cha.GetCHAByEmail(ctx, authCtx.UserID)
-			if err != nil {
-				http.Error(w, "failed to resolve default CHA profile", http.StatusForbidden)
-				return
-			}
-			filter.ChaID = &cha.ID
+		cha, err := c.cha.GetCHAByEmail(ctx, authCtx.Email)
+		if err != nil {
+			http.Error(w, "failed to resolve default CHA profile", http.StatusForbidden)
+			return
 		}
+		filter.ChaID = &cha.ID
 	case "trader":
 		filter.TraderID = &authCtx.UserID
 	default:
