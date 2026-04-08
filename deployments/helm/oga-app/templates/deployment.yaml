@@ -32,21 +32,25 @@ spec:
             - name: VITE_API_BASE_URL
               value: "/api"
             - name: VITE_IDP_BASE_URL
-              value: {{ .Values.config.idpBaseUrl | quote }}
+              value: {{ tpl .Values.config.idpBaseUrl . | quote }}
             - name: VITE_IDP_CLIENT_ID
-              value: {{ .Values.config.idpClientId | quote }}
+              value: {{ tpl .Values.config.idpClientId . | quote }}
             - name: VITE_APP_URL
-              value: {{ .Values.config.appUrl | quote }}
+              value: {{ tpl .Values.config.appUrl . | quote }}
             - name: VITE_IDP_SCOPES
               value: {{ .Values.config.idpScopes | quote }}
             - name: VITE_IDP_PLATFORM
               value: {{ .Values.config.idpPlatform | quote }}
             - name: VITE_OGA_API_BASE_URL
-              value: {{ .Values.config.apiBaseUrl | quote }}
+              value: {{ tpl .Values.config.apiBaseUrl . | quote }}
             - name: VITE_SHOW_AUTOFILL_BUTTON
               value: "true"
             - name: OGA_BACKEND_URL
-              value: {{ .Values.config.ogaBackendUrl | quote }}
+              value: {{ tpl .Values.config.ogaBackendUrl . | quote }}
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/templates/default.conf.template
+              subPath: default.conf.template
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           securityContext:
@@ -54,3 +58,7 @@ spec:
             runAsNonRoot: true
             capabilities:
               drop: ["ALL"]
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: {{ .Release.Name }}-nginx-config

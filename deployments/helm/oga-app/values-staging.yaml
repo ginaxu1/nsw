@@ -7,4 +7,4 @@ config:
   idpBaseUrl: "https://idp-thunder-national-single-window-platform.apps.sovecloud1.akaza.lk"
 
 route:
-  host: "staging-{{ .Values.config.instanceConfig | default \"oga\" }}.apps.sovecloud1.akaza.lk"
+  host: ""

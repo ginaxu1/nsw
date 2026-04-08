@@ -1,8 +1,17 @@
+# deployments/helm/oga-app/values-dev-ird.yaml
+
 fullnameOverride: "dev-oga-ird"
+
 config:
+  # Instructs the frontend to load ird.config.ts
   instanceConfig: "ird"
+  
+  # The exact client ID seeded in the IDP
   idpClientId: "OGA_PORTAL_APP_IRD"
+  
+  # The hyphenated Frontend route OpenShift will auto-generate
   appUrl: "https://dev-oga-ird-national-single-window-platform.apps.sovecloud1.akaza.lk"
   
-  # The internal K8s DNS name for the Dev IRD backend (No external route needed!)
-  ogaBackendUrl: "http://dev-oga-ird-backend:8081"
+  # The internal K8s DNS name for the Dev IRD backend. 
+  # Nginx will proxy traffic here securely inside the cluster.
+  ogaBackendUrl: "http://dev-oga-ird-backend:8080"

@@ -1,16 +1,38 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
+namespace: national-single-window-platform
 kind: Kustomization
+
+generatorOptions:
+  disableNameSuffixHash: true
 
 helmCharts:
   - name: idp-umbrella
-    path: .
     releaseName: idp-thunder
     namespace: national-single-window-platform
     includeCRDs: false
-    valuesFile: custom-values.yaml
+    valuesFile: values-dev.yaml
+
+configMapGenerator:
+  - name: idp-thunder-bootstrap-scripts
+    files:
+      - charts/idp-umbrella/files/01-default-resources.sh
+      - charts/idp-umbrella/files/02-sample-resources.sh
 
 patches:
-  # 1. DEPLOYMENT PATCH (Strategic Merge Patch)
+  - target:
+      kind: Service
+      name: idp-thunder-service
+    patch: |-
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: idp-thunder-service
+      spec:
+        ports:
+          - name: http
+            port: 8090
+            targetPort: 8080
+
   - target:
       kind: Deployment
       name: idp-thunder-deployment
@@ -22,17 +44,16 @@ patches:
       spec:
         template:
           spec:
-            # Strip Pod-level rigid SCCs completely
-            securityContext:
-              $patch: delete
+            securityContext: null
             containers:
-              - name: thunder 
-                # Strip Container-level rigid SCCs
-                securityContext:
-                  $patch: delete
-                # Force working directory
+              - name: thunder
+                securityContext: null
                 workingDir: /opt/thunder
-                # Inject subPath mounts (Matches Python script: key, crypto, cert)
+                ports:
+                  - containerPort: 8080
+                    name: http
+                  - containerPort: 8081
+                    name: console
                 volumeMounts:
                   - name: thunder-signing-keys
                     mountPath: /opt/thunder/repository/certs/signing.key
@@ -43,14 +64,12 @@ patches:
                   - name: thunder-signing-keys
                     mountPath: /opt/thunder/repository/certs/signing.cert
                     subPath: signing.cert
-            # Inject the Secret Volume
             volumes:
               - name: thunder-signing-keys
                 secret:
                   secretName: thunder-signing-keys
                   defaultMode: 420
 
-  # 2. SETUP JOB PATCH (Strategic Merge Patch)
   - target:
       kind: Job
       name: idp-thunder-setup
@@ -62,16 +81,10 @@ patches:
       spec:
         template:
           spec:
-            # Strip Pod-level rigid SCCs completely
-            securityContext:
-              $patch: delete
+            securityContext: null
             containers:
-              # IMPORTANT: Replace 'setup' with the exact setup container name from the Helm chart
-              - name: setup 
-                # Strip Container-level rigid SCCs
-                securityContext:
-                  $patch: delete
-                # Inject subPath mounts
+              - name: setup
+                securityContext: null
                 volumeMounts:
                   - name: thunder-signing-keys
                     mountPath: /opt/thunder/repository/certs/signing.key
@@ -87,8 +100,6 @@ patches:
                 secret:
                   secretName: thunder-signing-keys
                   defaultMode: 420
-              # Swap the ConfigMap binding. 
-              # By specifying the volume name, Kustomize safely merges this without needing index '2'
               - name: idp-thunder-config-map 
                 configMap:
                   name: idp-thunder-bootstrap-scripts

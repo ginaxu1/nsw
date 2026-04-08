@@ -1,78 +1,41 @@
-{{- if .Values.migrations.enabled }}
+{{- if .Values.dbMigrations.enabled }}
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ .Release.Name }}-db-migration-{{ .Release.Revision }}
+  name: {{ include "nsw-api.fullname" . }}-migration
   labels:
     {{- include "nsw-api.labels" . | nindent 4 }}
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
-    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-weight": "-5"
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 spec:
+  backoffLimit: {{ .Values.dbMigrations.backoffLimit | default 3 }}
   template:
-    metadata:
-      name: {{ .Release.Name }}-db-migration
     spec:
-      {{- if .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml .Values.imagePullSecrets | nindent 8 }}
-      {{- end }}
-      securityContext:
-        runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
-      restartPolicy: OnFailure
       containers:
-        - name: run-migrations
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
-          # Declarative migration engine Docker image embedding Goose and SQL files
-          image: "{{ .Values.migrations.image.repository }}{{ if .Values.migrations.image.tag }}:{{ .Values.migrations.image.tag }}{{ end }}"
-          imagePullPolicy: {{ .Values.migrations.image.pullPolicy | default "Always" }}
-          command: ["sh", "/scripts/run-migrations.sh"]
+        - name: psql-migration
+          image: {{ .Values.dbMigrations.image | default "registry.redhat.io/rhel8/postgresql-12:latest" }}
           env:
-            - name: PGHOST
-              value: {{ .Values.config.database.host | quote }}
-            - name: PGPORT
-              value: {{ .Values.config.database.port | quote }}
-            - name: PGUSER
-              value: {{ .Values.config.database.username | quote }}
             - name: PGPASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.config.database.credentialsSecretName | default (printf "%s-db-credentials" .Release.Name) }}
-                  key: password
-            - name: PGDATABASE
-              value: {{ .Values.config.database.name | quote }}
-            - name: NPQS_OGA_SUBMISSION_URL
-              value: {{ .Values.migrations.ogaSubmissionUrls.npqs | quote }}
-            - name: FCAU_OGA_SUBMISSION_URL
-              value: {{ .Values.migrations.ogaSubmissionUrls.fcau | quote }}
-            - name: IRD_OGA_SUBMISSION_URL
-              value: {{ .Values.migrations.ogaSubmissionUrls.preconsignment | quote }}
-          resources:
-            requests:
-              cpu: 50m
-              memory: 64Mi
-            limits:
-              cpu: 200m
-              memory: 128Mi
+                  name: {{ .Values.dbMigrations.secretName | default (include "nsw-api.fullname" .) }}
+                  key: {{ .Values.dbMigrations.secretKey | default "db-password" }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              echo "Starting migrations..."
+              psql -h {{ .Values.dbMigrations.host | default "nsw-db" }} \
+                   -U {{ .Values.dbMigrations.user | default "postgres" }} \
+                   -d {{ .Values.dbMigrations.database | default "nsw" }} \
+                   -f /migrations/init.sql
           volumeMounts:
             - name: migration-scripts
-              mountPath: /scripts
-            - name: migration-sql
               mountPath: /migrations
+      restartPolicy: OnFailure
       volumes:
         - name: migration-scripts
           configMap:
-            name: nsw-api-db-migrations
-            defaultMode: 0755
-        - name: migration-sql
-          configMap:
-            name: nsw-api-db-migrations
-            defaultMode: 0644
+            name: {{ include "nsw-api.fullname" . }}-db-migrations
 {{- end }}

@@ -1,12 +1,10 @@
-# deployments/helm/oga-app/values.yaml (Base Schema)
+# deployments/helm/oga-app/values.yaml
 
 global:
   clusterDomain: "apps.sovecloud1.akaza.lk"
   namespace: "national-single-window-platform"
 
-# Explicitly allow renaming the deployment resources per agency
 fullnameOverride: ""
-
 replicaCount: 1
 
 image:
@@ -29,7 +27,7 @@ config:
   appUrl: ""
   ogaBackendUrl: ""
 
-  # Shared Platform Specifics
+  # Shared Platform Specifics: Left blank to FORCE environment overrides
   apiBaseUrl: ""
   idpBaseUrl: ""
   idpScopes: "openid,profile,email"
@@ -49,3 +47,13 @@ route:
   tls:
     termination: edge
     insecureEdgeTerminationPolicy: Redirect
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1

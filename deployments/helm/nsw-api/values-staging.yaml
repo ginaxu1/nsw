@@ -28,7 +28,10 @@ config:
     clientSecret: "nsw-staging-secret"
   cors:
     allowedOrigins:
-      - "https://staging-trader-national-single-window-platform.apps.sovecloud1.akaza.lk"
+      - "https://staging-trader-app-national-single-window-platform.apps.sovecloud1.akaza.lk"
+      - "https://staging-oga-fcau-national-single-window-platform.apps.sovecloud1.akaza.lk"
+      - "https://staging-oga-ird-national-single-window-platform.apps.sovecloud1.akaza.lk"
+      - "https://staging-oga-npqs-national-single-window-platform.apps.sovecloud1.akaza.lk"
 
 service:
   temporalHost: "temporal-server:7233"

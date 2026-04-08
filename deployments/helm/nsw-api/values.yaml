@@ -58,8 +58,7 @@ config:
   internalServiceUrl: "http://nsw-api.{{ .Release.Namespace }}.svc.cluster.local"
 
   cors:
-    allowedOrigins:
-      - "https://trader-app.{{ .Release.Namespace }}.{{ .Values.global.clusterDomain }}"
+    allowedOrigins: "https://trader-app.{{ .Release.Namespace }}.{{ .Values.global.clusterDomain }}"
 
   storage:
     type: "local"
@@ -87,31 +86,23 @@ route:
     termination: edge
     insecureEdgeTerminationPolicy: Redirect
 
-# --- Database Migrations (init container) ---
-migrations:
-  enabled: true
-  image:
-    repository: registry.redhat.io/rhel8/postgresql-12@sha256:fd7b47517df99487c02d86f57b0b6722c32551bcf89ce61018d6a5e355c7c212
-    tag: ""
-    pullPolicy: IfNotPresent
-  resources:
-    limits:
-      cpu: 200m
-      memory: 256Mi
-    requests:
-      cpu: 50m
-      memory: 64Mi
-  ogaSubmissionUrls:
-    npqs: "http://{{ .Values.config.servicePrefix }}oga-npqs-backend.{{ .Release.Namespace }}.svc.cluster.local:8081/api/oga/inject"
-    fcau: "http://{{ .Values.config.servicePrefix }}oga-fcau-backend.{{ .Release.Namespace }}.svc.cluster.local:8081/api/oga/inject"
-    ird: "http://{{ .Values.config.servicePrefix }}oga-ird-backend.{{ .Release.Namespace }}.svc.cluster.local:8081/api/oga/inject"
-
 autoscaling:
   enabled: false
-  minReplicas: 2
+  minReplicas: 1
   maxReplicas: 5
   targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
 
 podDisruptionBudget:
-  enabled: false
+  enabled: true
   minAvailable: 1
+
+dbMigrations:
+  enabled: true
+  image: "registry.redhat.io/rhel8/postgresql-12:latest"
+  host: "nsw-db"
+  user: "postgres"
+  database: "nsw"
+  secretName: "nsw-db-secret"
+  secretKey: "password"
+  backoffLimit: 3

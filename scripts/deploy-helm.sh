@@ -20,17 +20,15 @@ kubectl exec deployment/nsw-db -n "$NAMESPACE" -- psql -U postgres -c "CREATE DA
 # 1. Build Dependencies
 echo ">>> 1. Building Helm Dependencies"
 helm dependency build ./deployments/helm/nsw-api
-helm dependency build ./deployments/helm/idp
+helm dependency build ./deployments/helm/idp/charts/idp-umbrella
 helm dependency build ./deployments/helm/oga-backend
 helm dependency build ./deployments/helm/oga-app
 
-# 2. Deploy IDP Thunder (Patched Deployment)
-echo ">>> 2. Deploying Declarative IDP Thunder (with Patching)"
-helm template idp-thunder ./deployments/helm/idp -n "$NAMESPACE" --values ./deployments/helm/idp/custom-values.yaml > /tmp/idp-raw.yaml
-python3 /tmp/patch_idp.py
+# 2. Deploy IDP Thunder (Declarative Kustomize Deployment)
+echo ">>> 2. Deploying Declarative IDP Thunder"
 # Cleanup old seed job to trigger rerun
 kubectl delete job idp-thunder-seed-job -n "$NAMESPACE" --ignore-not-found
-kubectl apply -n "$NAMESPACE" -f /tmp/idp-patched.yaml
+kustomize build --enable-helm ./deployments/helm/idp | kubectl apply -f -
 
 # 3. Deploy Core NSW API
 echo ">>> 3. Deploying Core NSW API"

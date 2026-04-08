@@ -1,8 +1,17 @@
+# deployments/helm/oga-app/values-dev-npqs.yaml
+
 fullnameOverride: "dev-oga-npqs"
+
 config:
+  # Instructs the frontend to load npqs.config.ts
   instanceConfig: "npqs"
+  
+  # The exact client ID seeded in the IDP
   idpClientId: "OGA_PORTAL_APP_NPQS"
+  
+  # The hyphenated Frontend route OpenShift will auto-generate
   appUrl: "https://dev-oga-npqs-national-single-window-platform.apps.sovecloud1.akaza.lk"
   
-  # The internal K8s DNS name for the Dev NPQS backend (No external route needed!)
-  ogaBackendUrl: "http://dev-oga-npqs-backend:8081"
+  # The internal K8s DNS name for the Dev NPQS backend. 
+  # Nginx will proxy traffic here securely inside the cluster.
+  ogaBackendUrl: "http://dev-oga-npqs-backend:8080"
