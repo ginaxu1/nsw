@@ -19,7 +19,7 @@ func TestLocalFSDriver_DirectoryHashing(t *testing.T) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	driver, err := NewLocalFSDriver(tempDir, "/uploads")
+	driver, err := NewLocalFSDriver(tempDir, "/uploads", "local-dev-secret")
 	if err != nil {
 		t.Fatalf("failed to create driver: %v", err)
 	}
@@ -81,7 +81,7 @@ func TestLocalFSDriver_RejectsPathTraversal(t *testing.T) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	driver, err := NewLocalFSDriver(tempDir, "/uploads")
+	driver, err := NewLocalFSDriver(tempDir, "/uploads", "local-dev-secret")
 	if err != nil {
 		t.Fatalf("failed to create driver: %v", err)
 	}
@@ -113,7 +113,7 @@ func TestLocalFSDriver_ConcurrentWritesSameDir(t *testing.T) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	driver, err := NewLocalFSDriver(tempDir, "/uploads")
+	driver, err := NewLocalFSDriver(tempDir, "/uploads", "local-dev-secret")
 	if err != nil {
 		t.Fatalf("failed to create driver: %v", err)
 	}
@@ -168,7 +168,7 @@ func TestLocalFSDriver_RejectsKeyWithNullOrSpecialChars(t *testing.T) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	driver, err := NewLocalFSDriver(tempDir, "/uploads")
+	driver, err := NewLocalFSDriver(tempDir, "/uploads", "local-dev-secret")
 	if err != nil {
 		t.Fatalf("failed to create driver: %v", err)
 	}
@@ -196,7 +196,7 @@ func TestLocalFSDriver_PathTraversal(t *testing.T) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	driver, err := NewLocalFSDriver(tempDir, "/uploads")
+	driver, err := NewLocalFSDriver(tempDir, "/uploads", "local-dev-secret")
 	if err != nil {
 		t.Fatalf("failed to create driver: %v", err)
 	}
@@ -219,7 +219,7 @@ func BenchmarkLocalFSDriver_Get(b *testing.B) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	driver, err := NewLocalFSDriver(tempDir, "/uploads")
+	driver, err := NewLocalFSDriver(tempDir, "/uploads", "local-dev-secret")
 	if err != nil {
 		b.Fatal(err)
 	}

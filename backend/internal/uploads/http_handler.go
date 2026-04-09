@@ -1,9 +1,6 @@
 package uploads
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -11,6 +8,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/OpenNSW/nsw/internal/auth"
@@ -124,44 +122,65 @@ func (h *HTTPHandler) UploadContentLocal(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Verify security token (HMAC)
+	// Extract security constraints from query parameters
 	token := r.URL.Query().Get("token")
-	if token == "" {
-		writeJSONError(w, http.StatusUnauthorized, "missing security token")
+	expiresAtStr := r.URL.Query().Get("expiresAt")
+	encodedContentType := r.URL.Query().Get("contentType")
+	maxSizeBytesStr := r.URL.Query().Get("maxSizeBytes")
+
+	if token == "" || expiresAtStr == "" || encodedContentType == "" || maxSizeBytesStr == "" {
+		writeJSONError(w, http.StatusUnauthorized, "missing security token or constraints")
 		return
 	}
 
-	secret := "local-dev-secret"
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(key))
-	expectedToken := hex.EncodeToString(mac.Sum(nil))
+	expiresAt, err := strconv.ParseInt(expiresAtStr, 10, 64)
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid expiration format")
+		return
+	}
 
-	if !hmac.Equal([]byte(token), []byte(expectedToken)) {
+	maxSizeBytes, err := strconv.ParseInt(maxSizeBytesStr, 10, 64)
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid max size format")
+		return
+	}
+
+	// Verify HMAC token (signs all constraints)
+	if !driver.VerifyToken(key, token, expiresAt, encodedContentType, maxSizeBytes) {
 		writeJSONError(w, http.StatusUnauthorized, "invalid security token")
 		return
 	}
 
-	// Get the length and content type if provided
-	contentType := r.Header.Get("Content-Type")
-	if contentType == "" {
-		contentType = "application/octet-stream"
-	}
-
-	// Enforce Local MIME Type Allowlist
-	if !isAllowedContentType(contentType) {
-		writeJSONError(w, http.StatusUnsupportedMediaType, "unsupported media type")
+	// 1. Enforce TTL (Time-To-Live)
+	if time.Now().Unix() > expiresAt {
+		writeJSONError(w, http.StatusForbidden, "upload link expired")
 		return
 	}
 
-	// Prevent Local Disk Exhaustion (DoS) - enforce 32MB limit
-	r.Body = http.MaxBytesReader(w, r.Body, 32<<20)
+	// 2. Enforce Content-Type (Strict Check)
+	var contentType string
+	contentType = r.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	if contentType != encodedContentType {
+		writeJSONError(w, http.StatusUnsupportedMediaType, "content-type mismatch")
+		return
+	}
+
+	// 3. Prevent Local Disk Exhaustion (DoS) - enforce dynamic limit from URL
+	r.Body = http.MaxBytesReader(w, r.Body, maxSizeBytes)
 
 	// Save using the local driver
-	err := driver.Save(r.Context(), key, r.Body, contentType)
+	err = driver.Save(r.Context(), key, r.Body, contentType)
 	if err != nil {
 		slog.ErrorContext(r.Context(), "Local upload failed", "key", key, "error", err)
-		// MaxBytesReader returns a specific error when exceeded, but driver.Save might wrap it.
-		writeJSONError(w, http.StatusInternalServerError, "failed to save file")
+		// MaxBytesReader returns a specific error when exceeded
+		if strings.Contains(err.Error(), "http: request body too large") {
+			writeJSONError(w, http.StatusRequestEntityTooLarge, "file size exceeds specified limit")
+		} else {
+			writeJSONError(w, http.StatusInternalServerError, "failed to save file")
+		}
 		return
 	}
 

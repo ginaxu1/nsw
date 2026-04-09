@@ -3,15 +3,14 @@ package uploads
 import (
 	"bytes"
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
+	"time"
 
 	"github.com/OpenNSW/nsw/internal/auth"
 	"github.com/OpenNSW/nsw/internal/uploads/drivers"
@@ -21,7 +20,7 @@ import (
 
 func TestDownloadContent_LocalDriver_Success(t *testing.T) {
 	tempDir := t.TempDir()
-	driver, _ := drivers.NewLocalFSDriver(tempDir, "/api/v1/uploads")
+	driver, _ := drivers.NewLocalFSDriver(tempDir, "/api/v1/uploads", "local-dev-secret")
 	service := NewUploadService(driver)
 	handler := NewHTTPHandler(service)
 
@@ -167,7 +166,7 @@ func TestUpload_Unauthorized(t *testing.T) {
 	handler := NewHTTPHandler(NewUploadService(&MockDriver{}))
 
 	body := map[string]any{
-		"filename": "test.pdf",
+		"filename":  "test.pdf",
 		"mime_type": "application/pdf",
 		"size":      1024,
 	}
@@ -224,20 +223,28 @@ func TestUpload_Success(t *testing.T) {
 
 func TestUploadContentLocal_Success(t *testing.T) {
 	tempDir := t.TempDir()
-	driver, _ := drivers.NewLocalFSDriver(tempDir, "/api/v1/uploads")
+	driver, _ := drivers.NewLocalFSDriver(tempDir, "/api/v1/uploads", "local-dev-secret")
 	service := NewUploadService(driver)
 	handler := NewHTTPHandler(service)
 
 	key := "550e8400-e29b-41d4-a716-446655440000.pdf"
 	content := []byte("pdf content")
 
-	// Generate valid HMAC token
-	secret := "local-dev-secret"
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(key))
-	token := hex.EncodeToString(mac.Sum(nil))
+	// Generate valid upload URL using the driver
+	contentType := "application/pdf"
+	maxSizeBytes := int64(32 << 20)
 
-	req := httptest.NewRequest(http.MethodPut, "/uploads/local-put/"+key+"?token="+token, bytes.NewReader(content))
+	uploadURL, err := driver.GetUploadURL(context.Background(), key, 15*time.Minute, contentType, maxSizeBytes)
+	if err != nil {
+		t.Fatalf("Failed to get upload URL: %v", err)
+	}
+
+	parsedURL, err := url.Parse(uploadURL)
+	if err != nil {
+		t.Fatalf("Failed to parse upload URL: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPut, parsedURL.RequestURI(), bytes.NewReader(content))
 	req.SetPathValue("key", key)
 	req.Header.Set("Content-Type", "application/pdf")
 	rec := httptest.NewRecorder()
