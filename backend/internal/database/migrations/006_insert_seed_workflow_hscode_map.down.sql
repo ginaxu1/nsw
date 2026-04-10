@@ -2,4 +2,4 @@
 -- Description: Roll back workflow HS code mapping seed data.
 
 DELETE FROM workflow_template_maps 
-WHERE id IN ('c3d4e5f6-7890-4000-8000-000000000001');
+WHERE id IN ('c3d4e5f6-0001-4000-d000-000000000001');
