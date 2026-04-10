@@ -41,7 +41,7 @@ config:
     port: 5432
     name: "nsw_db"
     username: "postgres"
-    # password comes from Secret: nsw-db-credentials.password
+    credentialsSecretName: "nsw-db-credentials"
     sslMode: "disable"
 
   auth:
@@ -51,7 +51,7 @@ config:
     audience: "TRADER_PORTAL_APP"
     clientId: "TRADER_PORTAL_APP"
     # Set to true if the IDP is using a self-signed cert internally (common in GovCloud)
-    insecureSkipTlsVerify: true
+    insecureSkipTlsVerify: false
 
   serviceUrl: "https://nsw-api-national-single-window-platform.apps.sovecloud1.akaza.lk/api/v1"
   internalServiceUrl: "http://nsw-api.national-single-window-platform.svc.cluster.local"
@@ -130,4 +130,3 @@ dbMigrations:
       cpu: 10m
       memory: 64Mi
   user: postgres
-

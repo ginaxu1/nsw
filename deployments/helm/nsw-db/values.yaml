@@ -21,5 +21,5 @@ resources:
 
 auth:
   username: "postgres"
-  # password should be set via --set-string auth.password=$PASS at install time or use an existing secret
-  password: ""
+  # password MUST be set via --set auth.password=$PASS at install time
+  password: null

@@ -25,7 +25,7 @@ config:
     issuer: "https://idp-thunder-national-single-window-platform.apps.sovecloud1.akaza.lk"
     jwksUrl: "https://idp-thunder-national-single-window-platform.apps.sovecloud1.akaza.lk/oauth2/jwks"
     clientId: "nsw-staging-client"
-    clientSecret: "nsw-staging-secret"
+    credentialsSecretName: "nsw-api-auth-credentials"
   cors:
     allowedOrigins: "https://staging-trader-app-national-single-window-platform.apps.sovecloud1.akaza.lk,https://staging-oga-fcau-national-single-window-platform.apps.sovecloud1.akaza.lk,https://staging-oga-ird-national-single-window-platform.apps.sovecloud1.akaza.lk,https://staging-oga-npqs-national-single-window-platform.apps.sovecloud1.akaza.lk"
 
