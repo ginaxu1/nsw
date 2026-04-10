@@ -1,3 +1,4 @@
+BEGIN;
 -- ============================================================================
 -- Migration: 010_workflow_table.down.sql
 -- Purpose: Revert the unification of workflow_id and restore original columns.
@@ -32,14 +33,17 @@ SET consignment_id = CASE WHEN EXISTS (SELECT 1 FROM consignments c WHERE c.id =
     pre_consignment_id = CASE WHEN EXISTS (SELECT 1 FROM pre_consignments pc WHERE pc.id = wn.workflow_id) THEN workflow_id ELSE NULL END;
 
 -- 6. Restore constraints to workflow_nodes
+ALTER TABLE workflow_nodes DROP CONSTRAINT IF EXISTS fk_workflow_nodes_consignment;
 ALTER TABLE workflow_nodes ADD CONSTRAINT fk_workflow_nodes_consignment
     FOREIGN KEY (consignment_id) REFERENCES consignments(id)
     ON UPDATE CASCADE ON DELETE CASCADE;
 
+ALTER TABLE workflow_nodes DROP CONSTRAINT IF EXISTS fk_workflow_nodes_pre_consignment;
 ALTER TABLE workflow_nodes ADD CONSTRAINT fk_workflow_nodes_pre_consignment
     FOREIGN KEY (pre_consignment_id) REFERENCES pre_consignments(id)
     ON UPDATE CASCADE ON DELETE CASCADE;
 
+ALTER TABLE workflow_nodes DROP CONSTRAINT IF EXISTS chk_workflow_nodes_parent_exclusive;
 ALTER TABLE workflow_nodes ADD CONSTRAINT chk_workflow_nodes_parent_exclusive
     CHECK (((consignment_id IS NOT NULL) AND (pre_consignment_id IS NULL)) OR ((consignment_id IS NULL) AND (pre_consignment_id IS NOT NULL)));
 
@@ -58,3 +62,5 @@ CREATE INDEX IF NOT EXISTS idx_consignments_global_context ON consignments USING
 
 -- 9. Drop the workflows table
 DROP TABLE IF EXISTS workflows;
+
+COMMIT;

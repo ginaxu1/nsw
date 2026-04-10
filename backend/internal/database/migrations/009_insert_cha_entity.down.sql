@@ -1,5 +1,7 @@
 -- Migration: 009_insert_cha_entity.down.sql
 -- Description: Roll back CHA entity seed data.
+-- Clear operational data that depends on these entities
+DELETE FROM consignments;
 
 DELETE FROM customs_house_agents 
 WHERE id IN (
