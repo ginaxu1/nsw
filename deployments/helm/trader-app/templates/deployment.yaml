@@ -40,12 +40,12 @@ spec:
               value: {{ tpl .Values.config.appUrl . | quote }}
             - name: VITE_IDP_SCOPES
               value: {{ .Values.config.idpScopes | quote }}
-            - name: VITE_IDP_PLATFORM
-              value: {{ .Values.config.idpPlatform | quote }}
             - name: VITE_IDP_TRADER_GROUP_NAME
               value: {{ .Values.config.idpTraderGroupName | quote }}
             - name: VITE_IDP_CHA_GROUP_NAME
-              value: {{ .Values.config.idpChaGroupName | quote }}
+              value: {{ .Values.config.idpCHAGroupName | quote }}
+            - name: VITE_IDP_PLATFORM
+              value: {{ .Values.config.idpPlatform | quote }}
             - name: VITE_SHOW_AUTOFILL_BUTTON
               value: {{ .Values.config.showAutofillButton | quote }}
           livenessProbe:

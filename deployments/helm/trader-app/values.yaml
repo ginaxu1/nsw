@@ -29,7 +29,7 @@ config:
   idpScopes: "openid,profile,email,group,role"
   idpPlatform: "AsgardeoV2"
   idpTraderGroupName: "Traders"
-  idpChaGroupName: "CHA"
+  idpCHAGroupName: "CHA"
   showAutofillButton: "false"
 
 resources:
