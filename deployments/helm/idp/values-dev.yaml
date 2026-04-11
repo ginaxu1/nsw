@@ -1,0 +1,38 @@
+# Legacy Value Structure for Restoration
+global:
+  clusterDomain: "apps.sovecloud1.akaza.lk"
+
+ingress:
+  hostname: "idp-thunder-national-single-window-platform.apps.sovecloud1.akaza.lk"
+
+cors:
+  allowedOrigins:
+    - "https://dev-trader-app-national-single-window-platform.apps.sovecloud1.akaza.lk"
+    - "https://dev-oga-fcau-national-single-window-platform.apps.sovecloud1.akaza.lk"
+    - "https://dev-oga-ird-national-single-window-platform.apps.sovecloud1.akaza.lk"
+    - "https://dev-oga-npqs-national-single-window-platform.apps.sovecloud1.akaza.lk"
+
+thunder:
+  replicaCount: 1
+
+  configuration:
+    server:
+      publicUrl: "https://idp-thunder-national-single-window-platform.apps.sovecloud1.akaza.lk"
+    gateClient:
+      hostname: "idp-thunder-national-single-window-platform.apps.sovecloud1.akaza.lk"
+      port: 443
+      scheme: "https"
+
+    database:
+      config:
+        host: "nsw-db"
+        passwordRef:
+          name: "dev-nsw-db-credentials"
+      runtime:
+        host: "nsw-db"
+        passwordRef:
+          name: "dev-nsw-db-credentials"
+      user:
+        host: "nsw-db"
+        passwordRef:
+          name: "dev-nsw-db-credentials"
