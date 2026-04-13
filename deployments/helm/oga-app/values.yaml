@@ -7,13 +7,22 @@ global:
 fullnameOverride: ""
 replicaCount: 1
 
+podSecurityContext:
+  runAsNonRoot: true
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
 image:
   repository: ghcr.io/opennsw/oga-app
-  pullPolicy: Always
+  pullPolicy: IfNotPresent
   tag: latest
 
-imagePullSecrets:
-  - name: ghcr-secret
+imagePullSecrets: []
+#  - name: ghcr-secret
   
 service:
   type: ClusterIP
@@ -49,11 +58,21 @@ route:
     insecureEdgeTerminationPolicy: Redirect
 
 autoscaling:
-  enabled: false
+  enabled: true
   minReplicas: 2
   maxReplicas: 5
   targetCPUUtilizationPercentage: 80
 
 podDisruptionBudget:
-  enabled: false
+  enabled: true
   minAvailable: 1
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: oga-app
+          topologyKey: kubernetes.io/hostname

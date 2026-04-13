@@ -27,7 +27,7 @@ migrations:
   image:
     repository: registry.developers.crunchydata.com/crunchydata/crunchy-postgres
     tag: "ubi8-15.4-0"
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
   resources:
     limits:
       cpu: 200m
@@ -37,12 +37,22 @@ migrations:
       memory: 64Mi
 
 autoscaling:
-  enabled: false
+  enabled: true
   minReplicas: 2
   maxReplicas: 5
   targetCPUUtilizationPercentage: 80
 
 podDisruptionBudget:
-  enabled: false
+  enabled: true
   minAvailable: 1
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: oga-backend
+          topologyKey: kubernetes.io/hostname
 

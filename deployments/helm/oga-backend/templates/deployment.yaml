@@ -5,7 +5,9 @@ metadata:
   labels:
     {{- include "oga-backend.labels" . | nindent 4 }}
 spec:
+{{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount | default 1 }}
+{{- end }}
   selector:
     matchLabels:
       {{- include "oga-backend.selectorLabels" . | nindent 6 }}
@@ -17,6 +19,10 @@ spec:
       {{- if .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml .Values.imagePullSecrets | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
       {{- end }}
       containers:
         - name: {{ .Chart.Name }}
