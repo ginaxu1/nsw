@@ -2,6 +2,7 @@ package uploads
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -75,7 +76,7 @@ func (h *HTTPHandler) Upload(w http.ResponseWriter, r *http.Request) {
 			writeJSONError(w, http.StatusBadRequest, "file is required")
 			return
 		}
-		defer file.Close()
+		defer func() { _ = file.Close() }()
 
 		mimeType := header.Header.Get("Content-Type")
 		if mimeType == "" {
@@ -109,6 +110,7 @@ func (h *HTTPHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		Size     int64  `json:"size"`
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSONError(w, http.StatusBadRequest, "invalid request body")
 		return
@@ -221,7 +223,8 @@ func (h *HTTPHandler) UploadContentLocal(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		slog.ErrorContext(r.Context(), "Local upload failed", "key", key, "error", err)
 		// MaxBytesReader returns a specific error when exceeded
-		if strings.Contains(err.Error(), "http: request body too large") {
+		var maxBytesError *http.MaxBytesError
+		if errors.As(err, &maxBytesError) {
 			writeJSONError(w, http.StatusRequestEntityTooLarge, "file size exceeds specified limit")
 		} else {
 			writeJSONError(w, http.StatusInternalServerError, "failed to save file")

@@ -173,6 +173,7 @@ components:
       type: object
       required:
         - id
+        - name
         - key
         - size
         - mime_type

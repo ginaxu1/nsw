@@ -9,7 +9,7 @@ import (
 
 // GenerateToken creates an HMAC-SHA256 token signing multiple constraints.
 func GenerateToken(key, secret string, expiresAt int64, contentType string, maxSizeBytes int64) string {
-	payload := fmt.Sprintf("%s:%d:%s:%d", key, expiresAt, contentType, maxSizeBytes)
+	payload := fmt.Sprintf("%s\x00%d\x00%s\x00%d", key, expiresAt, contentType, maxSizeBytes)
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(payload))
 	return hex.EncodeToString(mac.Sum(nil))
@@ -26,7 +26,7 @@ func VerifyToken(key, token, secret string, expiresAt int64, contentType string,
 
 // GenerateDownloadToken creates an HMAC-SHA256 token specifically for download links (only signs key and expiration).
 func GenerateDownloadToken(key, secret string, expiresAt int64) string {
-	payload := fmt.Sprintf("%s:%d", key, expiresAt)
+	payload := fmt.Sprintf("%s\x00%d", key, expiresAt)
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(payload))
 	return hex.EncodeToString(mac.Sum(nil))
