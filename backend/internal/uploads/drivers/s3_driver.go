@@ -17,14 +17,19 @@ type S3Driver struct {
 	PresignClient *s3.PresignClient
 	Bucket        string
 	PublicURL     string // Optional: Base URL if files are public
+	presignTTL    time.Duration
 }
 
-func NewS3Driver(client *s3.Client, bucket string, publicURL string) *S3Driver {
+func NewS3Driver(client *s3.Client, bucket string, publicURL string, presignTTL time.Duration) *S3Driver {
+	if presignTTL == 0 {
+		presignTTL = 15 * time.Minute
+	}
 	return &S3Driver{
 		Client:        client,
 		PresignClient: s3.NewPresignClient(client),
 		Bucket:        bucket,
 		PublicURL:     publicURL,
+		presignTTL:    presignTTL,
 	}
 }
 
@@ -72,7 +77,7 @@ func (d *S3Driver) Delete(ctx context.Context, key string) error {
 // presignGet returns a presigned GET URL for the key; used by both GenerateURL and GetDownloadURL.
 func (d *S3Driver) presignGet(ctx context.Context, key string, ttl time.Duration) (string, error) {
 	if ttl == 0 {
-		ttl = time.Hour
+		ttl = d.presignTTL
 	}
 	presignedReq, err := d.PresignClient.PresignGetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(d.Bucket),
@@ -86,14 +91,14 @@ func (d *S3Driver) presignGet(ctx context.Context, key string, ttl time.Duration
 
 func (d *S3Driver) GetDownloadURL(ctx context.Context, key string, ttl time.Duration) (string, error) {
 	if ttl == 0 {
-		ttl = 15 * time.Minute
+		ttl = d.presignTTL
 	}
 	return d.presignGet(ctx, key, ttl)
 }
 
 func (d *S3Driver) GetUploadURL(ctx context.Context, key string, ttl time.Duration, contentType string, maxSizeBytes int64) (string, error) {
 	if ttl == 0 {
-		ttl = 15 * time.Minute
+		ttl = d.presignTTL
 	}
 
 	presignedReq, err := d.PresignClient.PresignPutObject(ctx, &s3.PutObjectInput{

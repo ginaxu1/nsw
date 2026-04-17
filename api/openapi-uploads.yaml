@@ -30,6 +30,9 @@ paths:
         required: true
         content:
           application/json:
+            description: >
+              New pre-signed URL flow. Returns upload metadata including a pre-signed
+              URL to PUT the file contents directly to storage.
             schema:
               type: object
               required:
@@ -47,6 +50,19 @@ paths:
                   type: integer
                   format: int64
                   description: The file size in bytes
+          multipart/form-data:
+            description: >
+              Legacy flow for backwards compatibility. Uploads the file directly
+              to the server in a single request.
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The file to upload
       responses:
         "200":
           description: File uploaded successfully

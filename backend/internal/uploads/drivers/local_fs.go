@@ -24,20 +24,25 @@ var (
 
 // LocalFSDriver implements StorageDriver for local disk with directory hashing
 type LocalFSDriver struct {
-	BaseDir   string
-	PublicURL string
-	secretKey string
+	BaseDir    string
+	PublicURL  string
+	secretKey  string
+	presignTTL time.Duration
 }
 
 // NewLocalFSDriver creates a new LocalFSDriver.
 // baseDir is where files will be stored.
 // publicURL is the base URL used to generate public links (e.g., /api/uploads).
 // secretKey is the secret used for HMAC signing of local-put upload URLs.
-func NewLocalFSDriver(baseDir, publicURL, secretKey string) (*LocalFSDriver, error) {
+// presignTTL is the default time-to-live for presigned URLs.
+func NewLocalFSDriver(baseDir, publicURL, secretKey string, presignTTL time.Duration) (*LocalFSDriver, error) {
 	if err := os.MkdirAll(baseDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create base directory: %w", err)
 	}
-	return &LocalFSDriver{BaseDir: baseDir, PublicURL: publicURL, secretKey: secretKey}, nil
+	if presignTTL == 0 {
+		presignTTL = 15 * time.Minute
+	}
+	return &LocalFSDriver{BaseDir: baseDir, PublicURL: publicURL, secretKey: secretKey, presignTTL: presignTTL}, nil
 }
 
 // getHashedPath generates a two-level deep path for a key to avoid flat directory issues.
@@ -145,7 +150,7 @@ func (d *LocalFSDriver) GetDownloadURL(ctx context.Context, key string, ttl time
 	}
 
 	if ttl == 0 {
-		ttl = 15 * time.Minute
+		ttl = d.presignTTL
 	}
 	expiresAt := time.Now().Add(ttl).Unix()
 	token := GenerateDownloadToken(key, d.secretKey, expiresAt)
@@ -169,7 +174,7 @@ func (d *LocalFSDriver) GetUploadURL(ctx context.Context, key string, ttl time.D
 	}
 
 	if ttl == 0 {
-		ttl = 15 * time.Minute
+		ttl = d.presignTTL
 	}
 	expiresAt := time.Now().Add(ttl).Unix()
 	token := GenerateToken(key, d.secretKey, expiresAt, contentType, maxSizeBytes)
@@ -181,7 +186,7 @@ func (d *LocalFSDriver) GetUploadURL(ctx context.Context, key string, ttl time.D
 	v.Set("contentType", contentType)
 	v.Set("maxSizeBytes", strconv.FormatInt(maxSizeBytes, 10))
 
-	return fmt.Sprintf("%s/api/v1/uploads/local-put/%s?%s",
+	return fmt.Sprintf("%s/api/v1/uploads/%s/content?%s",
 		d.PublicURL, key, v.Encode()), nil
 }
 

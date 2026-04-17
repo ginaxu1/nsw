@@ -20,7 +20,7 @@ import (
 
 func TestDownloadContent_LocalDriver_Success(t *testing.T) {
 	tempDir := t.TempDir()
-	driver, _ := drivers.NewLocalFSDriver(tempDir, "/api/v1/uploads", "local-dev-secret")
+	driver, _ := drivers.NewLocalFSDriver(tempDir, "/api/v1/uploads", "local-dev-secret", 15*time.Minute)
 	service := NewUploadService(driver)
 	handler := NewHTTPHandler(service)
 
@@ -235,7 +235,7 @@ func TestUpload_Success(t *testing.T) {
 
 func TestUploadContentLocal_Success(t *testing.T) {
 	tempDir := t.TempDir()
-	driver, _ := drivers.NewLocalFSDriver(tempDir, "/api/v1/uploads", "local-dev-secret")
+	driver, _ := drivers.NewLocalFSDriver(tempDir, "/api/v1/uploads", "local-dev-secret", 15*time.Minute)
 	service := NewUploadService(driver)
 	handler := NewHTTPHandler(service)
 

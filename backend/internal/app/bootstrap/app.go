@@ -294,7 +294,7 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 
 	// When using local storage, these endpoints serve as mocks for S3.
 	if _, ok := storageDriver.(*drivers.LocalFSDriver); ok {
-		mux.HandleFunc("PUT /api/v1/uploads/local-put/{key}", uploadHandler.UploadContentLocal)
+		mux.HandleFunc("PUT /api/v1/uploads/{key}/content", uploadHandler.UploadContentLocal)
 		mux.HandleFunc("GET /api/v1/uploads/{key}/content", uploadHandler.DownloadContent)
 	}
 
