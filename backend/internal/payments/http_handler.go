@@ -2,6 +2,7 @@ package payments
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 )
@@ -21,7 +22,7 @@ func NewHTTPHandler(service PaymentService) *HTTPHandler {
 func (h *HTTPHandler) HandleValidateReference(w http.ResponseWriter, r *http.Request) {
 	var req ValidateReferenceRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request payload", http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("invalid request payload: %v", err), http.StatusBadRequest)
 		return
 	}
 
@@ -46,7 +47,7 @@ func (h *HTTPHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 
 	var payload WebhookPayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		http.Error(w, "invalid webhook payload", http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("invalid webhook payload: %v", err), http.StatusBadRequest)
 		return
 	}
 

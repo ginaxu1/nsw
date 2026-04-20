@@ -20,30 +20,34 @@ type PaymentService interface {
 type paymentService struct {
 	repo       PaymentRepository
 	dispatcher events.EventDispatcher
+	gateway    PaymentGateway
 }
 
 // NewPaymentService initializes a new payment service.
-func NewPaymentService(repo PaymentRepository, dispatcher events.EventDispatcher) PaymentService {
-	return &paymentService{repo: repo, dispatcher: dispatcher}
+func NewPaymentService(repo PaymentRepository, dispatcher events.EventDispatcher, gateway PaymentGateway) PaymentService {
+	return &paymentService{repo: repo, dispatcher: dispatcher, gateway: gateway}
 }
 
-// CreateCheckoutSession saves the initial intent and returns mocked LankaPay session details.
+// CreateCheckoutSession saves the initial intent and returns gateway session details.
 func (s *paymentService) CreateCheckoutSession(ctx context.Context, req CreateCheckoutRequest) (*CreateCheckoutResponse, error) {
-	sessionID := "sess_" + fmt.Sprintf("%d", time.Now().UnixNano())
-	taskID, ok := req.Metadata["task_id"]
+	sourceID, ok := req.Metadata["task_id"]
 	if !ok {
 		return nil, fmt.Errorf("task_id is required in metadata")
+	}
+	gatewayResp, err := s.gateway.CreateIntent(ctx, req.Amount, req.Currency, req.ReferenceNumber, req.Metadata)
+	if err != nil {
+		return nil, fmt.Errorf("gateway failed to create intent: %w", err)
 	}
 
 	tx := &PaymentTransaction{
 		ID:              uuid.NewString(),
 		ReferenceNumber: req.ReferenceNumber,
-		TaskID:          taskID,
-		SessionID:       sessionID,
+		TaskID:          sourceID,
+		SessionID:       gatewayResp.GatewaySessionID,
 		Amount:          req.Amount,
 		Currency:        req.Currency,
 		Status:          PaymentStatusPending,
-		ExpiryDate:      req.ExpiresAt,
+		ExpiryDate:      gatewayResp.ExpiresAt,
 		GatewayMetadata: req.Metadata,
 	}
 
@@ -51,12 +55,12 @@ func (s *paymentService) CreateCheckoutSession(ctx context.Context, req CreateCh
 		return nil, fmt.Errorf("failed to create payment transaction: %w", err)
 	}
 
-	slog.Info("created checkout session", "reference_number", req.ReferenceNumber, "session_id", sessionID)
+	slog.Info("created checkout session", "reference_number", req.ReferenceNumber, "session_id", gatewayResp.GatewaySessionID)
 
 	return &CreateCheckoutResponse{
-		SessionID:   sessionID,
-		CheckoutURL: "https://sandbox.govpay.lk/checkout/" + sessionID,
-		ExpiresIn:   int(time.Until(req.ExpiresAt).Seconds()),
+		SessionID:   gatewayResp.GatewaySessionID,
+		CheckoutURL: gatewayResp.CheckoutURL,
+		ExpiresIn:   int(time.Until(gatewayResp.ExpiresAt).Seconds()),
 	}, nil
 }
 
@@ -119,13 +123,13 @@ func (s *paymentService) ProcessWebhook(ctx context.Context, payload WebhookPayl
 	slog.Info("payment transaction updated successfully", "reference", tx.ReferenceNumber, "status", tx.Status)
 
 	// Phase 1: Event-Driven Notification
-	// Ensure loose coupling by publishing to the internal event dispatcher 
+	// Ensure loose coupling by publishing to the internal event dispatcher
 	// rather than calling task manager or workflow functions synchronously.
 	if tx.Status == PaymentStatusSuccess && s.dispatcher != nil {
 		s.dispatcher.Publish(ctx, events.Event{
-			Type: "PaymentCompleted",
+			Type: EventPaymentCompleted,
 			Payload: InternalPaymentEvent{
-				EventType: "PaymentCompleted",
+				EventType: EventPaymentCompleted,
 				Data: EventData{
 					TaskID:               tx.TaskID,
 					ReferenceNumber:      tx.ReferenceNumber,

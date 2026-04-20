@@ -100,6 +100,8 @@ type EventData struct {
 	ConfirmedAt          string          `json:"confirmed_at"`
 }
 
+const EventPaymentCompleted = "PaymentCompleted"
+
 // InternalPaymentEvent represents the internal event the Payment Service fires for the Task Engine.
 type InternalPaymentEvent struct {
 	EventType string    `json:"event_type"`

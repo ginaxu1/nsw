@@ -141,7 +141,8 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 
 	paymentRepo := payments.NewPaymentRepository(db)
 	eventDispatcher := events.NewAsyncDispatcher()
-	paymentService := payments.NewPaymentService(paymentRepo, eventDispatcher)
+	paymentGateway := payments.NewLankaPayAdapter()
+	paymentService := payments.NewPaymentService(paymentRepo, eventDispatcher, paymentGateway)
 
 	factory := plugin.NewTaskFactory(cfg, db, paymentService)
 	tm, err := taskManager.NewTaskManager(db, factory)

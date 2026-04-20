@@ -10,6 +10,21 @@ import (
 	"gorm.io/gorm"
 )
 
+type mockGateway struct {
+	createIntentFunc func(ctx context.Context, amount decimal.Decimal, currency string, reference string, metadata map[string]string) (*GatewayIntentResponse, error)
+}
+
+func (m *mockGateway) CreateIntent(ctx context.Context, amount decimal.Decimal, currency string, reference string, metadata map[string]string) (*GatewayIntentResponse, error) {
+	if m.createIntentFunc != nil {
+		return m.createIntentFunc(ctx, amount, currency, reference, metadata)
+	}
+	return &GatewayIntentResponse{
+		GatewaySessionID: "mock-session",
+		CheckoutURL:      "http://mock.url",
+		ExpiresAt:        time.Now().Add(1 * time.Hour),
+	}, nil
+}
+
 type mockRepository struct {
 	txs       map[string]*PaymentTransaction
 	createErr error
@@ -71,7 +86,8 @@ func (m *mockRepository) WithTx(tx *gorm.DB) PaymentRepository {
 
 func TestCreateCheckoutSession(t *testing.T) {
 	repo := &mockRepository{txs: make(map[string]*PaymentTransaction)}
-	service := NewPaymentService(repo, nil)
+	gw := &mockGateway{}
+	service := NewPaymentService(repo, nil, gw)
 
 	req := CreateCheckoutRequest{
 		ReferenceNumber: "REF-123",
@@ -112,7 +128,8 @@ func TestCreateCheckoutSession(t *testing.T) {
 
 func TestValidateReference(t *testing.T) {
 	repo := &mockRepository{txs: make(map[string]*PaymentTransaction)}
-	service := NewPaymentService(repo, nil)
+	gw := &mockGateway{}
+	service := NewPaymentService(repo, nil, gw)
 
 	t.Run("not found", func(t *testing.T) {
 		resp, err := service.ValidateReference(context.Background(), ValidateReferenceRequest{PaymentReference: "NON-EXISTENT"})
@@ -155,7 +172,8 @@ func TestValidateReference(t *testing.T) {
 
 func TestProcessWebhook(t *testing.T) {
 	repo := &mockRepository{txs: make(map[string]*PaymentTransaction)}
-	service := NewPaymentService(repo, nil)
+	gw := &mockGateway{}
+	service := NewPaymentService(repo, nil, gw)
 
 	txKey := "REF-123"
 	repo.txs[txKey] = &PaymentTransaction{
