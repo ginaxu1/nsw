@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/OpenNSW/nsw/internal/events"
 	"github.com/google/uuid"
 )
 
@@ -17,13 +18,13 @@ type PaymentService interface {
 }
 
 type paymentService struct {
-	repo PaymentRepository
-	// In the future, we may inject event publishers or task managers here.
+	repo       PaymentRepository
+	dispatcher events.EventDispatcher
 }
 
 // NewPaymentService initializes a new payment service.
-func NewPaymentService(repo PaymentRepository) PaymentService {
-	return &paymentService{repo: repo}
+func NewPaymentService(repo PaymentRepository, dispatcher events.EventDispatcher) PaymentService {
+	return &paymentService{repo: repo, dispatcher: dispatcher}
 }
 
 // CreateCheckoutSession saves the initial intent and returns mocked LankaPay session details.
@@ -117,9 +118,26 @@ func (s *paymentService) ProcessWebhook(ctx context.Context, payload WebhookPayl
 
 	slog.Info("payment transaction updated successfully", "reference", tx.ReferenceNumber, "status", tx.Status)
 
-	// In a complete implementation, we'd emit an internal event here:
-	// "PaymentConfirmedEvent" for the Task Engine to pick up.
-	// We leave this uncoupled as requested ("ONLY focus first on implementing Payment Service").
+	// Phase 1: Event-Driven Notification
+	// Ensure loose coupling by publishing to the internal event dispatcher 
+	// rather than calling task manager or workflow functions synchronously.
+	if tx.Status == PaymentStatusSuccess && s.dispatcher != nil {
+		s.dispatcher.Publish(ctx, events.Event{
+			Type: "PaymentCompleted",
+			Payload: InternalPaymentEvent{
+				EventType: "PaymentCompleted",
+				Data: EventData{
+					TaskID:               tx.TaskID,
+					ReferenceNumber:      tx.ReferenceNumber,
+					GatewayTransactionID: tx.GatewayMetadata["gateway_transaction_id"],
+					Status:               tx.Status,
+					AmountPaid:           tx.Amount,
+					Currency:             tx.Currency,
+					ConfirmedAt:          payload.Timestamp,
+				},
+			},
+		})
+	}
 
 	return nil
 }

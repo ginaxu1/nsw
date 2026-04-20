@@ -71,7 +71,7 @@ func (m *mockRepository) WithTx(tx *gorm.DB) PaymentRepository {
 
 func TestCreateCheckoutSession(t *testing.T) {
 	repo := &mockRepository{txs: make(map[string]*PaymentTransaction)}
-	service := NewPaymentService(repo)
+	service := NewPaymentService(repo, nil)
 
 	req := CreateCheckoutRequest{
 		ReferenceNumber: "REF-123",
@@ -112,7 +112,7 @@ func TestCreateCheckoutSession(t *testing.T) {
 
 func TestValidateReference(t *testing.T) {
 	repo := &mockRepository{txs: make(map[string]*PaymentTransaction)}
-	service := NewPaymentService(repo)
+	service := NewPaymentService(repo, nil)
 
 	t.Run("not found", func(t *testing.T) {
 		resp, err := service.ValidateReference(context.Background(), ValidateReferenceRequest{PaymentReference: "NON-EXISTENT"})
@@ -155,7 +155,7 @@ func TestValidateReference(t *testing.T) {
 
 func TestProcessWebhook(t *testing.T) {
 	repo := &mockRepository{txs: make(map[string]*PaymentTransaction)}
-	service := NewPaymentService(repo)
+	service := NewPaymentService(repo, nil)
 
 	txKey := "REF-123"
 	repo.txs[txKey] = &PaymentTransaction{

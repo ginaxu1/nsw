@@ -12,6 +12,7 @@ import (
 	"github.com/OpenNSW/nsw/internal/auth"
 	"github.com/OpenNSW/nsw/internal/config"
 	"github.com/OpenNSW/nsw/internal/database"
+	"github.com/OpenNSW/nsw/internal/events"
 	"github.com/OpenNSW/nsw/internal/middleware"
 	"github.com/OpenNSW/nsw/internal/payments"
 	taskManager "github.com/OpenNSW/nsw/internal/task/manager"
@@ -139,7 +140,8 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 	}
 
 	paymentRepo := payments.NewPaymentRepository(db)
-	paymentService := payments.NewPaymentService(paymentRepo)
+	eventDispatcher := events.NewAsyncDispatcher()
+	paymentService := payments.NewPaymentService(paymentRepo, eventDispatcher)
 
 	factory := plugin.NewTaskFactory(cfg, db, paymentService)
 	tm, err := taskManager.NewTaskManager(db, factory)
