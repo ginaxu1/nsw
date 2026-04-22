@@ -2,9 +2,10 @@
  * OGA-app–specific upload implementation. Points to this app's backend;
  * when OGA moves to a separate repo, this file can target OGA-specific endpoints/S3 without touching shared UI.
  */
+import { getEnv } from '../runtimeConfig'
 import type { ApiClient } from '../api'
 
-const API_BASE_URL = (import.meta.env.VITE_OGA_API_BASE_URL as string | undefined) ?? 'http://localhost:8080/api/v1'
+const API_BASE_URL = getEnv('VITE_API_BASE_URL', 'http://localhost:8081')!
 
 export interface UploadResponse {
   key: string
@@ -12,8 +13,8 @@ export interface UploadResponse {
 }
 
 export async function uploadFile(apiClient: ApiClient, file: File): Promise<UploadResponse> {
-  // Request presigned URL and metadata from backend
-  const metadataResponse = await fetch(`${API_BASE_URL}/uploads`, {
+  // Request presigned URL and metadata from OGA backend proxy
+  const metadataResponse = await fetch(`${API_BASE_URL}/api/oga/uploads`, {
     method: 'POST',
     headers: {
       ...(await apiClient.getAuthHeaders(false)),
@@ -53,8 +54,15 @@ export async function uploadFile(apiClient: ApiClient, file: File): Promise<Uplo
 }
 
 export async function getDownloadUrl(apiClient: ApiClient, key: string): Promise<{ url: string; expiresAt: number }> {
+  // Use the API client to fetch download metadata via the OGA backend proxy
   const response = await apiClient.get<{ download_url: string; expires_at: number }>(
     `/api/oga/uploads/${key}`
   )
-  return { url: response.download_url, expiresAt: response.expires_at }
+
+  // Normalize the URL if it's a relative path (common in local dev)
+  const url = response.download_url.startsWith('/')
+    ? new URL(API_BASE_URL).origin + response.download_url
+    : response.download_url
+
+  return { url, expiresAt: response.expires_at }
 }
