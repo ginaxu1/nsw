@@ -260,7 +260,6 @@ start_service "oga-ird" "$ROOT_DIR/oga" env \
   OGA_NSW_TOKEN_URL="$OGA_NSW_TOKEN_URL" \
   OGA_NSW_SCOPES="$OGA_NSW_SCOPES" \
   OGA_NSW_TOKEN_INSECURE_SKIP_VERIFY="$OGA_NSW_TOKEN_INSECURE_SKIP_VERIFY" \
-  OGA_NSW_TOKEN_INSECURE_SKIP_VERIFY="$OGA_NSW_TOKEN_INSECURE_SKIP_VERIFY" \
   go run ./cmd/server
 
 start_service "oga-cda" "$ROOT_DIR/oga" env \
@@ -325,8 +324,6 @@ start_service "oga-app-ird" "$ROOT_DIR/portals/apps/oga-app" env \
   VITE_IDP_BASE_URL="$IDP_PUBLIC_URL" \
   VITE_IDP_CLIENT_ID="$IRD_IDP_CLIENT_ID" \
   VITE_APP_URL="http://localhost:${OGA_APP_IRD_PORT}" \
-  VITE_IDP_SCOPES="$IDP_SCOPES" \
-  VITE_IDP_PLATFORM="$IDP_PLATFORM" \
   VITE_IDP_SCOPES="$IDP_SCOPES" \
   VITE_IDP_PLATFORM="$IDP_PLATFORM" \
   pnpm run dev

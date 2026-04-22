@@ -47,7 +47,6 @@ volumes:
   oga-fcau-data:
   oga-ird-data:
   oga-cda-data:
-  oga-cda-postgres-data:
 
 # ---- Services ----------------------------------------------------------------
 
@@ -433,22 +432,6 @@ services:
   # OGA CDA — oga-cda-net
   # ============================================================================
 
-  oga-cda-db:
-    image: postgres:16-alpine
-    ports:
-      - "${OGA_CDA_DB_PORT:-55434}:5432"
-    environment:
-      POSTGRES_PASSWORD: ${OGA_CDA_DB_PASSWORD:-changeme}
-      POSTGRES_DB: ${OGA_CDA_DB_NAME:-oga_cda_db}
-    volumes:
-      - oga-cda-postgres-data:/var/lib/postgresql/data
-    networks:
-      - oga-cda-net
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${OGA_CDA_DB_USERNAME:-postgres}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
 
   oga-cda:
     image: nsw-oga-backend:local
@@ -459,17 +442,11 @@ services:
     networks:
       - oga-cda-net
     depends_on:
-      oga-cda-db:
-        condition: service_healthy
+      - oga-npqs
     environment:
       OGA_PORT: ${OGA_CDA_PORT:-8084}
-      OGA_DB_DRIVER: ${OGA_CDA_DB_DRIVER:-postgres}
-      OGA_DB_HOST: ${OGA_CDA_DB_HOST:-oga-cda-db}
-      OGA_DB_PORT: "5432"
-      OGA_DB_USER: ${OGA_CDA_DB_USERNAME:-postgres}
-      OGA_DB_PASSWORD: ${OGA_CDA_DB_PASSWORD:-changeme}
-      OGA_DB_NAME: ${OGA_CDA_DB_NAME:-oga_cda_db}
-      OGA_DB_SSLMODE: disable
+      OGA_DB_DRIVER: ${OGA_CDA_DB_DRIVER:-sqlite}
+      OGA_DB_PATH: ${OGA_CDA_DB_PATH:-/data/oga_applications.db}
       OGA_DEFAULT_FORM_ID: ${OGA_CDA_DEFAULT_FORM_ID:-default}
       OGA_ALLOWED_ORIGINS: ${OGA_CDA_ALLOWED_ORIGINS:-http://localhost:5177}
       OGA_NSW_API_BASE_URL: ${OGA_NSW_API_BASE_URL:-http://backend:8080/api/v1}
