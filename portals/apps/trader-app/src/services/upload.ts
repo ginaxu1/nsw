@@ -2,9 +2,10 @@
  * Trader-app–specific upload implementation. Points to this app's backend;
  * when the API or auth changes, only this file is updated.
  */
+import { getEnv } from '../runtimeConfig'
 import type { ApiClient } from './api'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1'
+const API_BASE_URL = getEnv('VITE_API_BASE_URL', 'http://localhost:8080/api/v1')!
 
 export interface UploadResponse {
   key: string
@@ -54,9 +55,15 @@ export async function uploadFile(apiClient: ApiClient, file: File): Promise<Uplo
 
 export async function getDownloadUrl(apiClient: ApiClient, key: string): Promise<{ url: string; expiresAt: number }> {
   // Use the API client to fetch the download metadata (download_url and expires_at)
-  // The endpoint matches the OGA portal backend's expectation.
+  // from the main backend's uploads endpoint.
   const response = await apiClient.get<{ download_url: string; expires_at: number }>(
-    `/api/oga/uploads/${key}`
+    `/uploads/${key}`
   )
-  return { url: response.download_url, expiresAt: response.expires_at }
+
+  // Normalize the URL if it's a relative path (common in local dev)
+  const url = response.download_url.startsWith('/')
+    ? new URL(API_BASE_URL).origin + response.download_url
+    : response.download_url
+
+  return { url, expiresAt: response.expires_at }
 }
