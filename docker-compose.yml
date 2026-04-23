@@ -352,8 +352,6 @@ services:
       - oga-fcau-data:/data
     networks:
       - oga-fcau-net
-    depends_on:
-      - oga-npqs
     environment:
       OGA_PORT: ${OGA_FCAU_PORT:-8082}
       OGA_DB_DRIVER: ${OGA_FCAU_DB_DRIVER:-sqlite}
@@ -396,8 +394,6 @@ services:
       - oga-ird-data:/data
     networks:
       - oga-ird-net
-    depends_on:
-      - oga-npqs
     environment:
       OGA_PORT: ${OGA_IRD_PORT:-8083}
       OGA_DB_DRIVER: ${OGA_IRD_DB_DRIVER:-sqlite}
@@ -441,8 +437,6 @@ services:
       - oga-cda-data:/data
     networks:
       - oga-cda-net
-    depends_on:
-      - oga-npqs
     environment:
       OGA_PORT: ${OGA_CDA_PORT:-8084}
       OGA_DB_DRIVER: ${OGA_CDA_DB_DRIVER:-sqlite}
