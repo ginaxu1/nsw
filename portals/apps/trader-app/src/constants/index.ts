@@ -2,13 +2,9 @@
  * Application-wide constants
  */
 
-import { getEnv } from '../runtimeConfig'
+import { getRequiredEnv } from '../runtimeConfig'
 
-const API_BASE_URL = getEnv('VITE_API_BASE_URL')
-
-if (!API_BASE_URL) {
-  throw new Error('Missing required environment variable: VITE_API_BASE_URL')
-}
+export const API_BASE_URL = getRequiredEnv('VITE_API_BASE_URL')
 
 // TODO: Replace with actual auth context
 export const DEFAULT_TRADER_ID = 'trader-123'
