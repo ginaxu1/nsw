@@ -6,9 +6,6 @@ import { getRequiredEnv } from '../runtimeConfig'
 
 export const API_BASE_URL = getRequiredEnv('VITE_API_BASE_URL')
 
-// TODO: Replace with actual auth context
-export const DEFAULT_TRADER_ID = 'trader-123'
-
 // API Configuration
 export const API_CONFIG = {
   BASE_URL: API_BASE_URL,
