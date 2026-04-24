@@ -4,12 +4,18 @@
 
 import { getEnv } from '../runtimeConfig'
 
+const API_BASE_URL = getEnv('VITE_API_BASE_URL')
+
+if (!API_BASE_URL) {
+  throw new Error('Missing required environment variable: VITE_API_BASE_URL')
+}
+
 // TODO: Replace with actual auth context
 export const DEFAULT_TRADER_ID = 'trader-123'
 
 // API Configuration
 export const API_CONFIG = {
-  BASE_URL: getEnv('VITE_API_BASE_URL', 'http://localhost:8080/api/v1')!,
+  BASE_URL: API_BASE_URL,
   TIMEOUT: 30000, // 30 seconds
 } as const
 
