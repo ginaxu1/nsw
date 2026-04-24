@@ -5,7 +5,30 @@
 import { getEnv } from '../runtimeConfig'
 import type { ApiClient } from '../api'
 
-const API_BASE_URL = getEnv('VITE_API_BASE_URL', 'http://localhost:8081')!
+const API_BASE_URL = (() => {
+  const value = getEnv('VITE_API_BASE_URL')
+  if (!value) {
+    throw new Error('Missing required environment variable: VITE_API_BASE_URL')
+  }
+  return value
+})()
+
+interface UploadMetadataRequest {
+  filename: string
+  mime_type: string
+  size: number
+}
+
+interface UploadMetadataResponse {
+  key: string
+  name: string
+  upload_url: string
+}
+
+interface DownloadMetadataResponse {
+  download_url: string
+  expires_at: number
+}
 
 export interface UploadResponse {
   key: string
@@ -13,30 +36,17 @@ export interface UploadResponse {
 }
 
 export async function uploadFile(apiClient: ApiClient, file: File): Promise<UploadResponse> {
-  // Request presigned URL and metadata from OGA backend proxy
-  const metadataResponse = await fetch(`${API_BASE_URL}/api/oga/uploads`, {
-    method: 'POST',
-    headers: {
-      ...(await apiClient.getAuthHeaders(false)),
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
+  const metadata = await apiClient.post<UploadMetadataRequest, UploadMetadataResponse>(
+    '/api/oga/uploads',
+    {
       filename: file.name,
       mime_type: file.type || 'application/octet-stream',
       size: file.size,
-    }),
-  })
-
-  if (!metadataResponse.ok) {
-    const errorText = await metadataResponse.text()
-    console.error(`Metadata request error ${metadataResponse.status}: ${errorText}`)
-    throw new Error(`Failed to initialize upload: ${metadataResponse.status} ${metadataResponse.statusText}`)
-  }
-
-  const meta = (await metadataResponse.json()) as { key: string; name: string; upload_url: string }
+    }
+  )
 
   // Upload file bytes directly to the storage destination (presigned URL)
-  const uploadResponse = await fetch(meta.upload_url, {
+  const uploadResponse = await fetch(metadata.upload_url, {
     method: 'PUT',
     headers: {
       'Content-Type': file.type || 'application/octet-stream',
@@ -50,14 +60,11 @@ export async function uploadFile(apiClient: ApiClient, file: File): Promise<Uplo
     throw new Error(`Failed to upload file to storage: ${uploadResponse.status} ${uploadResponse.statusText}`)
   }
 
-  return { key: meta.key, name: meta.name }
+  return { key: metadata.key, name: metadata.name }
 }
 
 export async function getDownloadUrl(apiClient: ApiClient, key: string): Promise<{ url: string; expiresAt: number }> {
-  // Use the API client to fetch download metadata via the OGA backend proxy
-  const response = await apiClient.get<{ download_url: string; expires_at: number }>(
-    `/api/oga/uploads/${key}`
-  )
+  const response = await apiClient.get<DownloadMetadataResponse>(`/api/oga/uploads/${key}`)
 
   // Normalize the URL if it's a relative path (common in local dev)
   const url = response.download_url.startsWith('/')

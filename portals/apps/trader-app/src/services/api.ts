@@ -1,6 +1,10 @@
 import { getEnv } from '../runtimeConfig'
 
-const API_BASE_URL = getEnv('VITE_API_BASE_URL', 'http://localhost:8080/api/v1')!
+const API_BASE_URL = getEnv('VITE_API_BASE_URL')
+
+if (!API_BASE_URL) {
+  throw new Error('Missing required environment variable: VITE_API_BASE_URL')
+}
 
 export type QueryParams = Record<string, string | number | undefined>
 export type AccessTokenProvider = () => Promise<string | null | undefined>
