@@ -2,16 +2,8 @@
  * Trader-app–specific upload implementation. Points to this app's backend;
  * when the API or auth changes, only this file is updated.
  */
-import { getEnv } from '../runtimeConfig'
 import type { ApiClient } from './api'
-
-const API_BASE_URL = (() => {
-  const value = getEnv('VITE_API_BASE_URL')
-  if (!value) {
-    throw new Error('Missing required environment variable: VITE_API_BASE_URL')
-  }
-  return value
-})()
+import { API_BASE_URL } from '../constants'
 
 interface UploadMetadataRequest {
   filename: string

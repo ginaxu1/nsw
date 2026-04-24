@@ -1,8 +1,6 @@
 // API service for OGA Portal
 import type { JsonSchema, UISchemaElement } from '@jsonforms/core';
-import { getRequiredEnv } from './runtimeConfig';
-
-const API_BASE_URL = getRequiredEnv('VITE_API_BASE_URL');
+import { API_BASE_URL } from './constants';
 
 export type AccessTokenProvider = () => Promise<string | null | undefined>
 
