@@ -41,7 +41,8 @@ log_info "Creating default organization unit..."
 RESPONSE=$(thunder_api_call POST "/organization-units" '{
   "handle": "default",
   "name": "Default",
-  "description": "Default organization unit"
+  "description": "Default organization unit",
+  "logoUrl": "emoji:🏛️"
 }')
 
 HTTP_CODE="${RESPONSE: -3}"
@@ -95,53 +96,65 @@ RESPONSE=$(thunder_api_call POST "/user-schemas" '{
   "schema": {
     "username": {
       "type": "string",
+      "displayName": "Username",
       "required": true,
       "unique": true
     },
     "email": {
       "type": "string",
+      "displayName": "Email",
       "required": true,
       "unique": true,
       "regex": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
     },
     "email_verified": {
       "type": "boolean",
+      "displayName": "Email Verified",
       "required": false
     },
     "given_name": {
       "type": "string",
+      "displayName": "First Name",
       "required": false
     },
     "family_name": {
       "type": "string",
+      "displayName": "Last Name",
       "required": false
     },
     "mobileNumber": {
       "type": "string",
+      "displayName": "Mobile Number",
       "required": false
     },
     "phone_number": {
       "type": "string",
+      "displayName": "Phone Number",
       "required": false
     },
     "phone_number_verified": {
       "type": "boolean",
+      "displayName": "Phone Number Verified",
       "required": false
     },
     "sub": {
       "type": "string",
+      "displayName": "Subject",
       "required": false
     },
     "name": {
       "type": "string",
+      "displayName": "Full Name",
       "required": false
     },
     "picture": {
       "type": "string",
+      "displayName": "Picture",
       "required": false
     },
     "password": {
       "type": "string",
+      "displayName": "Password",
       "required": true,
       "credential": true
     }
@@ -1136,34 +1149,35 @@ fi
 RESPONSE=$(thunder_api_call POST "/applications" "{
   \"name\": \"Console\",
   \"description\": \"Management application for Thunder\",
+  \"ouId\": \"${DEFAULT_OU_ID}\",
   \"url\": \"${PUBLIC_URL}/console\",
-  \"logo_url\": \"emoji:👨‍💻\",
-  \"auth_flow_id\": \"${CONSOLE_AUTH_FLOW_ID}\",
-  \"registration_flow_id\": \"${CONSOLE_REG_FLOW_ID}\",
-  \"is_registration_flow_enabled\": false,
-  \"allowed_user_types\": [\"Person\"],
-  \"user_attributes\": [\"given_name\",\"family_name\",\"email\",\"groups\", \"name\", \"ouId\"],
-  \"inbound_auth_config\": [{
+  \"logoUrl\": \"emoji:👨‍💻\",
+  \"authFlowId\": \"${CONSOLE_AUTH_FLOW_ID}\",
+  \"registrationFlowId\": \"${CONSOLE_REG_FLOW_ID}\",
+  \"isRegistrationFlowEnabled\": false,
+  \"allowedUserTypes\": [\"Person\"],
+  \"userAttributes\": [\"given_name\",\"family_name\",\"email\",\"groups\", \"name\", \"ouId\"],
+  \"inboundAuthConfig\": [{
     \"type\": \"oauth2\",
     \"config\": {
-      \"client_id\": \"CONSOLE\",
-      \"redirect_uris\": [${REDIRECT_URIS}],
-      \"grant_types\": [\"authorization_code\"],
-      \"response_types\": [\"code\"],
-      \"pkce_required\": true,
-      \"token_endpoint_auth_method\": \"none\",
-      \"public_client\": true,
+      \"clientId\": \"CONSOLE\",
+      \"redirectUris\": [${REDIRECT_URIS}],
+      \"grantTypes\": [\"authorization_code\"],
+      \"responseTypes\": [\"code\"],
+      \"pkceRequired\": true,
+      \"tokenEndpointAuthMethod\": \"none\",
+      \"publicClient\": true,
       \"token\": {
-        \"access_token\": {
-          \"validity_period\": 3600,
-          \"user_attributes\": [\"given_name\",\"family_name\",\"email\",\"groups\", \"name\", \"ouId\"]
+        \"accessToken\": {
+          \"validityPeriod\": 3600,
+          \"userAttributes\": [\"given_name\",\"family_name\",\"email\",\"groups\", \"name\", \"ouId\"]
         },
-        \"id_token\": {
-          \"validity_period\": 3600,
-          \"user_attributes\": [\"given_name\",\"family_name\",\"email\",\"groups\", \"name\", \"ouId\"]
+        \"idToken\": {
+          \"validityPeriod\": 3600,
+          \"userAttributes\": [\"given_name\",\"family_name\",\"email\",\"groups\", \"name\", \"ouId\"]
         }
       },
-      \"scope_claims\": {
+      \"scopeClaims\": {
         \"profile\": [\"name\",\"given_name\",\"family_name\",\"picture\"],
         \"email\": [\"email\",\"email_verified\"],
         \"phone\": [\"phone_number\",\"phone_number_verified\"],

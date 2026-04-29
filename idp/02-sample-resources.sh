@@ -94,8 +94,8 @@ get_flow_id_by_handle() {
     BODY="${RESPONSE%???}"
 
     if [[ "$HTTP_CODE" != "200" ]]; then
-            echo ""
-            return
+        echo ""
+        return
     fi
 
     echo "$BODY" | grep -o '{[^}]*"handle":"'"${FLOW_HANDLE}"'"[^}]*}' | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4
@@ -113,119 +113,133 @@ get_application_id_by_client_id() {
         return
     fi
 
-    echo "$BODY" | sed 's/},{/}\n{/g' | grep "\"client_id\":\"${CLIENT_ID}\"" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4
+    echo "$BODY" | sed 's/},{/}\n{/g' | grep "\"clientId\":\"${CLIENT_ID}\"" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4
+}
+
+get_ou_id_by_handle() {
+    local OU_HANDLE="$1"
+    local RESPONSE HTTP_CODE BODY
+    RESPONSE=$(thunder_api_call GET "/organization-units/tree/${OU_HANDLE}")
+    HTTP_CODE="${RESPONSE: -3}"
+    BODY="${RESPONSE%???}"
+
+    if [[ "$HTTP_CODE" != "200" ]]; then
+        echo ""
+        return
+    fi
+
+    extract_first_id "$BODY"
 }
 
 create_user_in_ou() {
-        local USER_TYPE="$1"
-        local OU_ID="$2"
-        local USERNAME="$3"
-        local EMAIL="$4"
-        local GIVEN_NAME="$5"
-        local FAMILY_NAME="$6"
+    local USER_TYPE="$1"
+    local OU_ID="$2"
+    local USERNAME="$3"
+    local EMAIL="$4"
+    local GIVEN_NAME="$5"
+    local FAMILY_NAME="$6"
     local PASSWORD="$7"
-        local RESPONSE HTTP_CODE BODY USER_ID
+    local RESPONSE HTTP_CODE BODY USER_ID
 
-        read -r -d '' USER_PAYLOAD <<JSON || true
+    read -r -d '' USER_PAYLOAD <<JSON || true
 {
-"type": "${USER_TYPE}",
-"ouId": "${OU_ID}",
-"attributes": {
-    "username": "${USERNAME}",
-    "password": "${PASSWORD}",
-    "email": "${EMAIL}",
-    "given_name": "${GIVEN_NAME}",
-    "family_name": "${FAMILY_NAME}"
-}
+    "type": "${USER_TYPE}",
+    "ouId": "${OU_ID}",
+    "attributes": {
+        "username": "${USERNAME}",
+        "password": "${PASSWORD}",
+        "email": "${EMAIL}",
+        "given_name": "${GIVEN_NAME}",
+        "family_name": "${FAMILY_NAME}"
+    }
 }
 JSON
 
-        RESPONSE=$(thunder_api_call POST "/users" "${USER_PAYLOAD}")
-        HTTP_CODE="${RESPONSE: -3}"
-        BODY="${RESPONSE%???}"
+    RESPONSE=$(thunder_api_call POST "/users" "${USER_PAYLOAD}")
+    HTTP_CODE="${RESPONSE: -3}"
+    BODY="${RESPONSE%???}"
 
-        if [[ "$HTTP_CODE" == "201" ]] || [[ "$HTTP_CODE" == "200" ]]; then
-                log_success "User ${USERNAME} created successfully"
-                USER_ID=$(extract_first_id "$BODY")
-        elif [[ "$HTTP_CODE" == "409" ]]; then
-                log_warning "User ${USERNAME} already exists, retrieving ID..."
-                USER_ID=$(get_user_id_by_username "$USERNAME")
-        else
-                log_error "Failed to create user ${USERNAME} (HTTP $HTTP_CODE)"
-                echo "Response: $BODY"
-                exit 1
-        fi
+    if [[ "$HTTP_CODE" == "201" ]] || [[ "$HTTP_CODE" == "200" ]]; then
+        log_success "User ${USERNAME} created successfully"
+        USER_ID=$(extract_first_id "$BODY")
+    elif [[ "$HTTP_CODE" == "409" ]]; then
+        log_warning "User ${USERNAME} already exists, retrieving ID..."
+        USER_ID=$(get_user_id_by_username "$USERNAME")
+    else
+        log_error "Failed to create user ${USERNAME} (HTTP $HTTP_CODE)"
+        echo "Response: $BODY"
+        exit 1
+    fi
 
-        if [[ -z "$USER_ID" ]]; then
-                log_error "Could not determine user ID for ${USERNAME}"
-                exit 1
-        fi
+    if [[ -z "$USER_ID" ]]; then
+        log_error "Could not determine user ID for ${USERNAME}"
+        exit 1
+    fi
 
-        log_info "${USERNAME} user ID: $USER_ID"
-        CREATED_USER_ID="$USER_ID"
+    log_info "${USERNAME} user ID: $USER_ID"
+    CREATED_USER_ID="$USER_ID"
 }
 
 create_spa_application() {
-        local APP_NAME="$1"
-        local APP_DESCRIPTION="$2"
-        local CLIENT_ID="$3"
-        local PORT="$4"
-        local ALLOWED_USER_TYPE="$5"
-        local RESPONSE HTTP_CODE BODY
-        local APP_ID APP_CLIENT_ID
+    local APP_NAME="$1"
+    local APP_DESCRIPTION="$2"
+    local CLIENT_ID="$3"
+    local PORT="$4"
+    local ALLOWED_USER_TYPE="$5"
+    local OU_ID="$6"
+    local RESPONSE HTTP_CODE BODY
+    local APP_ID APP_CLIENT_ID
 
-        log_info "Creating ${APP_NAME} application..."
+    log_info "Creating ${APP_NAME} application..."
 
-        ADDITIONAL_FIELDS=""
-        if [[ -n "$CLASSIC_THEME_ID" ]]; then
-                ADDITIONAL_FIELDS="${ADDITIONAL_FIELDS}
-    \"theme_id\": \"${CLASSIC_THEME_ID}\"," 
-        fi
-        if [[ -n "$AUTH_FLOW_ID" ]]; then
-                ADDITIONAL_FIELDS="${ADDITIONAL_FIELDS}
-    \"auth_flow_id\": \"${AUTH_FLOW_ID}\"," 
-        fi
-        if [[ -n "$REG_FLOW_ID" ]]; then
-                ADDITIONAL_FIELDS="${ADDITIONAL_FIELDS}
-    \"registration_flow_id\": \"${REG_FLOW_ID}\"," 
-        fi
+    ADDITIONAL_FIELDS=""
+    if [[ -n "$CLASSIC_THEME_ID" ]]; then
+        ADDITIONAL_FIELDS="${ADDITIONAL_FIELDS}
+    \"themeId\": \"${CLASSIC_THEME_ID}\"," 
+    fi
+    if [[ -n "$AUTH_FLOW_ID" ]]; then
+        ADDITIONAL_FIELDS="${ADDITIONAL_FIELDS}
+    \"authFlowId\": \"${AUTH_FLOW_ID}\"," 
+    fi
+    if [[ -n "$REG_FLOW_ID" ]]; then
+        ADDITIONAL_FIELDS="${ADDITIONAL_FIELDS}
+    \"registrationFlowId\": \"${REG_FLOW_ID}\"," 
+    fi
 
-        read -r -d '' APP_PAYLOAD <<JSON || true
+    read -r -d '' APP_PAYLOAD <<JSON || true
 {
     "name": "${APP_NAME}",
     "description": "${APP_DESCRIPTION}",${ADDITIONAL_FIELDS}
-    "is_registration_flow_enabled": false,
+    "ouId": "${OU_ID}",
+    "isRegistrationFlowEnabled": false,
     "template": "react",
-    "logo_url": "https://ssl.gstatic.com/docs/common/profile/kiwi_lg.png",
+    "logoUrl": "https://ssl.gstatic.com/docs/common/profile/kiwi_lg.png",
     "assertion": {
-        "validity_period": 3600
+        "validityPeriod": 3600
     },
-    "certificate": {
-        "type": "NONE"
-    },
-    "inbound_auth_config": [
+    "inboundAuthConfig": [
         {
             "type": "oauth2",
             "config": {
-                "client_id": "${CLIENT_ID}",
-                "redirect_uris": [
+                "clientId": "${CLIENT_ID}",
+                "redirectUris": [
                     "http://localhost:${PORT}",
                     "https://localhost:${PORT}"
                 ],
-                "grant_types": [
+                "grantTypes": [
                     "authorization_code",
                     "refresh_token"
                 ],
-                "response_types": [
+                "responseTypes": [
                     "code"
                 ],
-                "token_endpoint_auth_method": "none",
-                "pkce_required": true,
-                "public_client": true,
+                "tokenEndpointAuthMethod": "none",
+                "pkceRequired": true,
+                "publicClient": true,
                 "token": {
-                    "access_token": {
-                        "validity_period": 3600,
-                        "user_attributes": [
+                    "accessToken": {
+                        "validityPeriod": 3600,
+                        "userAttributes": [
                             "email",
                             "family_name",
                             "given_name",
@@ -237,9 +251,9 @@ create_spa_application() {
                             "username"
                         ]
                     },
-                    "id_token": {
-                        "validity_period": 3600,
-                        "user_attributes": [
+                    "idToken": {
+                        "validityPeriod": 3600,
+                        "userAttributes": [
                             "email",
                             "family_name",
                             "given_name",
@@ -259,16 +273,30 @@ create_spa_application() {
                     "group",
                     "role"
                 ],
-                "user_info": {
-                    "user_attributes": [
+                "userInfo": {
+                    "userAttributes": [
                         "family_name",
                         "given_name",
                         "email"
                     ]
                 },
-                "scope_claims": {
+                "scopeClaims": {
+                    "profile": [
+                        "name",
+                        "given_name",
+                        "family_name"
+                    ],
+                    "email": [
+                        "email"
+                    ],
+                    "phone": [
+                        "phone_number"
+                    ],
                     "group": [
                         "groups"
+                    ],
+                    "ou": [
+                        "ouId"
                     ],
                     "role": [
                         "roles"
@@ -277,33 +305,43 @@ create_spa_application() {
             }
         }
     ],
-    "allowed_user_types": [
+    "userAttributes": [
+        "given_name",
+        "family_name",
+        "email",
+        "groups",
+        "ouId",
+        "ouHandle",
+        "ouName",
+        "username"
+    ],
+    "allowedUserTypes": [
         "${ALLOWED_USER_TYPE}"
     ]
 }
 JSON
 
-        RESPONSE=$(thunder_api_call POST "/applications" "${APP_PAYLOAD}")
-        HTTP_CODE="${RESPONSE: -3}"
-        BODY="${RESPONSE%???}"
+    RESPONSE=$(thunder_api_call POST "/applications" "${APP_PAYLOAD}")
+    HTTP_CODE="${RESPONSE: -3}"
+    BODY="${RESPONSE%???}"
 
-        if [[ "$HTTP_CODE" == "201" ]] || [[ "$HTTP_CODE" == "200" ]] || [[ "$HTTP_CODE" == "202" ]]; then
-                log_success "${APP_NAME} application created successfully"
-                APP_ID=$(extract_first_id "$BODY")
-                APP_CLIENT_ID=$(echo "$BODY" | grep -o '"client_id":"[^"]*"' | head -1 | cut -d'"' -f4)
-                if [[ -n "$APP_ID" ]]; then
-                        log_info "${APP_NAME} app ID: ${APP_ID}"
-                fi
-                if [[ -n "$APP_CLIENT_ID" ]]; then
-                        log_info "${APP_NAME} client ID: ${APP_CLIENT_ID}"
-                fi
-        elif [[ "$HTTP_CODE" == "409" ]] || ([[ "$HTTP_CODE" == "400" ]] && [[ "$BODY" =~ (Application\ already\ exists|APP-1022) ]]); then
-                log_warning "${APP_NAME} application already exists, skipping"
-        else
-                log_error "Failed to create ${APP_NAME} application (HTTP $HTTP_CODE)"
-                echo "Response: $BODY"
-                exit 1
+    if [[ "$HTTP_CODE" == "201" ]] || [[ "$HTTP_CODE" == "200" ]] || [[ "$HTTP_CODE" == "202" ]]; then
+        log_success "${APP_NAME} application created successfully"
+        APP_ID=$(extract_first_id "$BODY")
+        APP_CLIENT_ID=$(echo "$BODY" | grep -o '"clientId":"[^"]*"' | head -1 | cut -d'"' -f4)
+        if [[ -n "$APP_ID" ]]; then
+            log_info "${APP_NAME} app ID: ${APP_ID}"
         fi
+        if [[ -n "$APP_CLIENT_ID" ]]; then
+            log_info "${APP_NAME} client ID: ${APP_CLIENT_ID}"
+        fi
+    elif [[ "$HTTP_CODE" == "409" ]] || ([[ "$HTTP_CODE" == "400" ]] && [[ "$BODY" =~ (Application\ already\ exists|APP-1022) ]]); then
+        log_warning "${APP_NAME} application already exists, skipping"
+    else
+        log_error "Failed to create ${APP_NAME} application (HTTP $HTTP_CODE)"
+        echo "Response: $BODY"
+        exit 1
+    fi
 }
 
 create_m2m_application() {
@@ -311,6 +349,7 @@ create_m2m_application() {
     local APP_DESCRIPTION="$2"
     local CLIENT_ID="$3"
     local CLIENT_SECRET="$4"
+    local OU_ID="$5"
     local RESPONSE HTTP_CODE BODY
     local APP_ID APP_CLIENT_ID
 
@@ -320,34 +359,32 @@ create_m2m_application() {
 {
     "name": "${APP_NAME}",
     "description": "${APP_DESCRIPTION}",
-    "is_registration_flow_enabled": false,
+    "ouId": "${OU_ID}",
+    "isRegistrationFlowEnabled": false,
     "assertion": {
-        "validity_period": 3600
+        "validityPeriod": 3600
     },
-    "certificate": {
-        "type": "NONE"
-    },
-    "inbound_auth_config": [
+    "inboundAuthConfig": [
         {
             "type": "oauth2",
             "config": {
-                "client_id": "${CLIENT_ID}",
-                "client_secret": "${CLIENT_SECRET}",
-                "grant_types": [
+                "clientId": "${CLIENT_ID}",
+                "clientSecret": "${CLIENT_SECRET}",
+                "grantTypes": [
                     "client_credentials"
                 ],
-                "token_endpoint_auth_method": "client_secret_basic",
-                "pkce_required": false,
-                "public_client": false,
+                "tokenEndpointAuthMethod": "client_secret_basic",
+                "pkceRequired": false,
+                "publicClient": false,
                 "token": {
-                    "access_token": {
-                        "validity_period": 3600
+                    "accessToken": {
+                        "validityPeriod": 3600
                     }
                 }
             }
         }
     ],
-    "allowed_user_types": []
+    "allowedUserTypes": []
 }
 JSON
 
@@ -358,7 +395,7 @@ JSON
     if [[ "$HTTP_CODE" == "201" ]] || [[ "$HTTP_CODE" == "200" ]] || [[ "$HTTP_CODE" == "202" ]]; then
         log_success "${APP_NAME} M2M application created successfully"
         APP_ID=$(extract_first_id "$BODY")
-        APP_CLIENT_ID=$(echo "$BODY" | grep -o '"client_id":"[^"]*"' | head -1 | cut -d'"' -f4)
+        APP_CLIENT_ID=$(echo "$BODY" | grep -o '"clientId":"[^"]*"' | head -1 | cut -d'"' -f4)
     elif [[ "$HTTP_CODE" == "409" ]] || ([[ "$HTTP_CODE" == "400" ]] && [[ "$BODY" =~ (Application\ already\ exists|APP-1022) ]]); then
         log_warning "${APP_NAME} M2M application already exists, retrieving ID..."
         APP_ID=$(get_application_id_by_client_id "$CLIENT_ID")
@@ -388,12 +425,12 @@ ensure_user_in_group() {
 
     read -r -d '' MEMBERS_ADD_PAYLOAD <<JSON || true
 {
-  "members": [
-    {
-      "id": "${USER_ID}",
-      "type": "user"
-    }
-  ]
+    "members": [
+        {
+            "id": "${USER_ID}",
+            "type": "user"
+        }
+    ]
 }
 JSON
 
@@ -418,15 +455,27 @@ assign_role_to_group() {
     local ROLE_NAME="$3"
     local GROUP_NAME="$4"
     local RESPONSE HTTP_CODE BODY
+    
+    # Check existing assignments first to avoid server-side unique constraint errors
+    RESPONSE=$(thunder_api_call GET "/roles/${ROLE_ID}/assignments?type=group")
+    HTTP_CODE="${RESPONSE: -3}"
+    BODY="${RESPONSE%???}"
+
+    if [[ "$HTTP_CODE" == "200" ]]; then
+        if echo "$BODY" | grep -q "\"id\":\"${GROUP_ID}\""; then
+            log_warning "Role ${ROLE_NAME} is already assigned to group ${GROUP_NAME}, skipping"
+            return
+        fi
+    fi
 
     read -r -d '' ROLE_ASSIGNMENT_PAYLOAD <<JSON || true
 {
-  "assignments": [
-    {
-      "id": "${GROUP_ID}",
-      "type": "group"
-    }
-  ]
+    "assignments": [
+        {
+            "id": "${GROUP_ID}",
+            "type": "group"
+        }
+    ]
 }
 JSON
 
@@ -438,6 +487,14 @@ JSON
         log_success "Assigned role ${ROLE_NAME} to group ${GROUP_NAME}"
     elif [[ "$HTTP_CODE" == "409" ]]; then
         log_warning "Role ${ROLE_NAME} is already assigned to group ${GROUP_NAME}, skipping"
+    elif [[ "$HTTP_CODE" == "500" ]]; then
+        if echo "$BODY" | grep -qi "UNIQUE constraint failed"; then
+            log_warning "Role ${ROLE_NAME} appears already assigned to group ${GROUP_NAME} (unique constraint), skipping"
+        else
+            log_error "Failed to assign role ${ROLE_NAME} to group ${GROUP_NAME} (HTTP $HTTP_CODE)"
+            echo "Response: $BODY"
+            exit 1
+        fi
     else
         log_error "Failed to assign role ${ROLE_NAME} to group ${GROUP_NAME} (HTTP $HTTP_CODE)"
         echo "Response: $BODY"
@@ -455,9 +512,9 @@ log_info "Creating Private Sector organization unit..."
 
 read -r -d '' PRIVATE_SECTOR_OU_PAYLOAD <<JSON || true
 {
-  "handle": "${PRIVATE_SECTOR_OU_HANDLE}",
-  "name": "Private Sector",
-  "description": "Organization unit for private sector entities"
+    "handle": "${PRIVATE_SECTOR_OU_HANDLE}",
+    "name": "Private Sector",
+    "description": "Organization unit for private sector entities"
 }
 JSON
 
@@ -507,10 +564,10 @@ log_info "Creating ABCD Traders child organization unit..."
 
 read -r -d '' ABCD_TRADERS_OU_PAYLOAD <<JSON || true
 {
-  "handle": "${ABCD_TRADERS_OU_HANDLE}",
-  "name": "ABCD Traders",
-  "description": "Child organization unit for ABCD Traders",
-  "parent": "${PRIVATE_SECTOR_OU_ID}"
+    "handle": "${ABCD_TRADERS_OU_HANDLE}",
+    "name": "ABCD Traders",
+    "description": "Child organization unit for ABCD Traders",
+    "parent": "${PRIVATE_SECTOR_OU_ID}"
 }
 JSON
 
@@ -563,9 +620,9 @@ log_info "Creating Government Organization root organization unit..."
 
 read -r -d '' GOVERNMENT_ORG_OU_PAYLOAD <<JSON || true
 {
-  "handle": "${GOVERNMENT_ORG_OU_HANDLE}",
-  "name": "Government Organization",
-  "description": "Root organization unit for government entities"
+    "handle": "${GOVERNMENT_ORG_OU_HANDLE}",
+    "name": "Government Organization",
+    "description": "Root organization unit for government entities"
 }
 JSON
 
@@ -607,10 +664,10 @@ log_info "Creating NPQS organization unit..."
 
 read -r -d '' NPQS_OU_PAYLOAD <<JSON || true
 {
-  "handle": "${NPQS_OU_HANDLE}",
-  "name": "NPQS",
-  "description": "National Plant Quarantine Service",
-  "parent": "${GOVERNMENT_ORG_OU_ID}"
+    "handle": "${NPQS_OU_HANDLE}",
+    "name": "NPQS",
+    "description": "National Plant Quarantine Service",
+    "parent": "${GOVERNMENT_ORG_OU_ID}"
 }
 JSON
 
@@ -652,10 +709,10 @@ log_info "Creating FCAU organization unit..."
 
 read -r -d '' FCAU_OU_PAYLOAD <<JSON || true
 {
-  "handle": "${FCAU_OU_HANDLE}",
-  "name": "FCAU",
-  "description": "Food Control Administration Unit",
-  "parent": "${GOVERNMENT_ORG_OU_ID}"
+    "handle": "${FCAU_OU_HANDLE}",
+    "name": "FCAU",
+    "description": "Food Control Administration Unit",
+    "parent": "${GOVERNMENT_ORG_OU_ID}"
 }
 JSON
 
@@ -697,10 +754,10 @@ log_info "Creating IRD organization unit..."
 
 read -r -d '' IRD_OU_PAYLOAD <<JSON || true
 {
-  "handle": "${IRD_OU_HANDLE}",
-  "name": "IRD",
-  "description": "Inland Revenue Department",
-  "parent": "${GOVERNMENT_ORG_OU_ID}"
+    "handle": "${IRD_OU_HANDLE}",
+    "name": "IRD",
+    "description": "Inland Revenue Department",
+    "parent": "${GOVERNMENT_ORG_OU_ID}"
 }
 JSON
 
@@ -742,10 +799,10 @@ log_info "Creating CDA organization unit..."
 
 read -r -d '' CDA_OU_PAYLOAD <<JSON || true
 {
-  "handle": "${CDA_OU_HANDLE}",
-  "name": "CDA",
-  "description": "Coconut Development Authority",
-  "parent": "${GOVERNMENT_ORG_OU_ID}"
+    "handle": "${CDA_OU_HANDLE}",
+    "name": "CDA",
+    "description": "Coconut Development Authority",
+    "parent": "${GOVERNMENT_ORG_OU_ID}"
 }
 JSON
 
@@ -792,38 +849,38 @@ log_info "Creating Private_User user type..."
 
 read -r -d '' PRIVATE_USER_TYPE_PAYLOAD <<JSON || true
 {
-  "name": "Private_User",
-  "ouId": "${PRIVATE_SECTOR_OU_ID}",
-  "allowSelfRegistration": false,
-  "schema": {
-    "username": {
-      "type": "string",
-      "required": true,
-      "unique": true
+    "name": "Private_User",
+    "ouId": "${PRIVATE_SECTOR_OU_ID}",
+    "allowSelfRegistration": false,
+    "schema": {
+        "username": {
+            "type": "string",
+            "required": true,
+            "unique": true
+        },
+        "password": {
+            "type": "string",
+            "required": true,
+            "credential": true
+        },
+        "email": {
+            "type": "string",
+            "required": true,
+            "unique": true,
+            "regex": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\\\.[a-zA-Z]{2,}$"
+        },
+        "given_name": {
+            "type": "string",
+            "required": false
+        },
+        "family_name": {
+            "type": "string",
+            "required": false
+        }
     },
-    "password": {
-      "type": "string",
-      "required": true,
-      "credential": true
-    },
-    "email": {
-      "type": "string",
-      "required": true,
-      "unique": true,
-      "regex": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\\\.[a-zA-Z]{2,}$"
-    },
-    "given_name": {
-      "type": "string",
-      "required": false
-    },
-    "family_name": {
-      "type": "string",
-      "required": false
+    "systemAttributes": {
+        "display": "username"
     }
-  },
-  "systemAttributes": {
-    "display": "username"
-  }
 }
 JSON
 
@@ -831,11 +888,11 @@ RESPONSE=$(thunder_api_call POST "/user-schemas" "${PRIVATE_USER_TYPE_PAYLOAD}")
 HTTP_CODE="${RESPONSE: -3}"
 
 if [[ "$HTTP_CODE" == "201" ]] || [[ "$HTTP_CODE" == "200" ]]; then
-        log_success "Private_User user type created successfully"
+    log_success "Private_User user type created successfully"
 elif [[ "$HTTP_CODE" == "409" ]]; then
-        log_warning "Private_User user type already exists, skipping"
+    log_warning "Private_User user type already exists, skipping"
 else
-        log_error "Failed to create Private_User user type (HTTP $HTTP_CODE)"
+    log_error "Failed to create Private_User user type (HTTP $HTTP_CODE)"
     exit 1
 fi
 
@@ -906,9 +963,9 @@ log_info "Creating Traders group..."
 
 read -r -d '' TRADERS_GROUP_PAYLOAD <<JSON || true
 {
-  "name": "Traders",
-  "description": "Trader members group",
-  "ouId": "${ABCD_TRADERS_OU_ID}"
+    "name": "Traders",
+    "description": "Trader members group",
+    "ouId": "${ABCD_TRADERS_OU_ID}"
 }
 JSON
 
@@ -945,9 +1002,9 @@ log_info "Creating CHA group..."
 
 read -r -d '' CHA_GROUP_PAYLOAD <<JSON || true
 {
-  "name": "CHA",
-  "description": "CHA members group",
-  "ouId": "${ABCD_TRADERS_OU_ID}"
+    "name": "CHA",
+    "description": "CHA members group",
+    "ouId": "${ABCD_TRADERS_OU_ID}"
 }
 JSON
 
@@ -984,10 +1041,10 @@ log_info "Creating Trader role..."
 
 read -r -d '' TRADER_ROLE_PAYLOAD <<JSON || true
 {
-  "name": "Trader",
-  "description": "Role for trader operations",
-  "ouId": "${PRIVATE_SECTOR_OU_ID}",
-  "permissions": []
+    "name": "Trader",
+    "description": "Role for trader operations",
+    "ouId": "${PRIVATE_SECTOR_OU_ID}",
+    "permissions": []
 }
 JSON
 
@@ -1019,10 +1076,10 @@ log_info "Creating CHA role..."
 
 read -r -d '' CHA_ROLE_PAYLOAD <<JSON || true
 {
-  "name": "CHA",
-  "description": "Role for CHA operations",
-  "ouId": "${PRIVATE_SECTOR_OU_ID}",
-  "permissions": []
+    "name": "CHA",
+    "description": "Role for CHA operations",
+    "ouId": "${PRIVATE_SECTOR_OU_ID}",
+    "permissions": []
 }
 JSON
 
@@ -1143,59 +1200,57 @@ fi
 echo ""
 
 # ============================================================================
-# Create 4 SPA Applications
+# Create SPA Applications
 # ============================================================================
 
-create_spa_application "TraderApp" "Application for trader portal built with React" "TRADER_PORTAL_APP" "5173" "Private_User"
-create_spa_application "NPQSPortalApp" "Application for NPQS portal built with React" "OGA_PORTAL_APP_NPQS" "5174" "Government_User"
-create_spa_application "FCAUPortalApp" "Application for FCAU portal built with React" "OGA_PORTAL_APP_FCAU" "5175" "Government_User"
-create_spa_application "IRDPortalApp" "Application for IRD portal built with React" "OGA_PORTAL_APP_IRD" "5176" "Government_User"
-create_spa_application "CDAPortalApp" "Application for CDA portal built with React" "OGA_PORTAL_APP_CDA" "5177" "Government_User"
+# Retrieve OU IDs for SPA applications
+echo "Fetching OU IDs for SPA applications..."
+DEFAULT_OU_ID_FOR_TRADER=$(get_ou_id_by_handle "default")
+NPQS_OU_ID_FOR_APP=$(get_ou_id_by_handle "government-organization/npqs")
+FCAU_OU_ID_FOR_APP=$(get_ou_id_by_handle "government-organization/fcau")
+IRD_OU_ID_FOR_APP=$(get_ou_id_by_handle "government-organization/ird")
+CDA_OU_ID_FOR_APP=$(get_ou_id_by_handle "government-organization/cda")
+
+create_spa_application "TraderApp" "Application for trader portal built with React" "TRADER_PORTAL_APP" "5173" "Private_User" "${DEFAULT_OU_ID_FOR_TRADER}"
+create_spa_application "NPQSPortalApp" "Application for NPQS portal built with React" "OGA_PORTAL_APP_NPQS" "5174" "Government_User" "${NPQS_OU_ID_FOR_APP}"
+create_spa_application "FCAUPortalApp" "Application for FCAU portal built with React" "OGA_PORTAL_APP_FCAU" "5175" "Government_User" "${FCAU_OU_ID_FOR_APP}"
+create_spa_application "IRDPortalApp" "Application for IRD portal built with React" "OGA_PORTAL_APP_IRD" "5176" "Government_User" "${IRD_OU_ID_FOR_APP}"
+create_spa_application "CDAPortalApp" "Application for CDA portal built with React" "OGA_PORTAL_APP_CDA" "5177" "Government_User" "${CDA_OU_ID_FOR_APP}"
 
 echo ""
 
 # ============================================================================
-# Resolve Default Organization Unit
+# Resolve Default Organization Unit for M2M Applications
 # ============================================================================
 
 DEFAULT_OU_HANDLE="default"
-log_info "Resolving Default organization unit..."
+log_info "Resolving Default organization unit for M2M applications..."
 
-RESPONSE=$(thunder_api_call GET "/organization-units/tree/${DEFAULT_OU_HANDLE}")
-HTTP_CODE="${RESPONSE: -3}"
-BODY="${RESPONSE%???}"
+DEFAULT_OU_ID_FOR_M2M=$(get_ou_id_by_handle "${DEFAULT_OU_HANDLE}")
 
-if [[ "$HTTP_CODE" == "200" ]]; then
-    DEFAULT_OU_ID=$(extract_first_id "$BODY")
-else
-    log_error "Failed to resolve Default organization unit (HTTP $HTTP_CODE)"
-    echo "Response: $BODY"
+if [[ -z "$DEFAULT_OU_ID_FOR_M2M" ]]; then
+    log_error "Could not determine Default organization unit ID for M2M applications"
     exit 1
 fi
 
-if [[ -z "$DEFAULT_OU_ID" ]]; then
-    log_error "Could not determine Default organization unit ID"
-    exit 1
-fi
-
-log_info "Default organization unit ID: ${DEFAULT_OU_ID}"
+log_info "Default organization unit ID for M2M: ${DEFAULT_OU_ID_FOR_M2M}"
 
 echo ""
 
 # ============================================================================
-# Create 3 M2M Applications
+# Create M2M Applications for external services calling NSW APIs
 # ============================================================================
 
-create_m2m_application "NPQS_TO_NSW_M2M" "Machine-to-machine integration for NPQS to NSW" "NPQS_TO_NSW" "${NPQS_M2M_CLIENT_SECRET}"
+create_m2m_application "NPQS_TO_NSW_M2M" "Machine-to-machine integration for NPQS to NSW" "NPQS_TO_NSW" "${NPQS_M2M_CLIENT_SECRET}" "${DEFAULT_OU_ID_FOR_M2M}"
 NPQS_TO_NSW_M2M_APP_ID="$CREATED_M2M_APP_ID"
 
-create_m2m_application "FCAU_TO_NSW_M2M" "Machine-to-machine integration for FCAU to NSW" "FCAU_TO_NSW" "${FCAU_M2M_CLIENT_SECRET}"
+create_m2m_application "FCAU_TO_NSW_M2M" "Machine-to-machine integration for FCAU to NSW" "FCAU_TO_NSW" "${FCAU_M2M_CLIENT_SECRET}" "${DEFAULT_OU_ID_FOR_M2M}"
 FCAU_TO_NSW_M2M_APP_ID="$CREATED_M2M_APP_ID"
 
-create_m2m_application "IRD_TO_NSW_M2M" "Machine-to-machine integration for IRD to NSW" "IRD_TO_NSW" "${IRD_M2M_CLIENT_SECRET}"
+create_m2m_application "IRD_TO_NSW_M2M" "Machine-to-machine integration for IRD to NSW" "IRD_TO_NSW" "${IRD_M2M_CLIENT_SECRET}" "${DEFAULT_OU_ID_FOR_M2M}"
 IRD_TO_NSW_M2M_APP_ID="$CREATED_M2M_APP_ID"
 
-create_m2m_application "CDA_TO_NSW_M2M" "Machine-to-machine integration for CDA to NSW" "CDA_TO_NSW" "${CDA_M2M_CLIENT_SECRET}"
+create_m2m_application "CDA_TO_NSW_M2M" "Machine-to-machine integration for CDA to NSW" "CDA_TO_NSW" "${CDA_M2M_CLIENT_SECRET}" "${DEFAULT_OU_ID_FOR_M2M}"
 CDA_TO_NSW_M2M_APP_ID="$CREATED_M2M_APP_ID"
 
 echo ""

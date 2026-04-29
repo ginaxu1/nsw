@@ -1,15 +1,16 @@
 services:
   # Initialize database from the image
   thunder-db-init:
-    image: ghcr.io/asgardeo/thunder:0.29.0
-    command: sh -c "cp -r /opt/thunder/repository/database/* /data/"
+    image: ghcr.io/asgardeo/thunder:0.35.0
+    command: sh -c "cp -r /opt/thunder/repository/database/* /data/ && (cp -r /opt/thunder/consent/repository/database/* /consent-data/ 2>/dev/null || true)"
     volumes:
       - thunder-db:/data
+      - consent-db:/consent-data
     restart: "no"
 
   # Run setup once with the shared database
   thunder-setup:
-    image: ghcr.io/asgardeo/thunder:0.29.0
+    image: ghcr.io/asgardeo/thunder:0.35.0
     command: ./setup.sh
     env_file:
       - .env
@@ -26,6 +27,7 @@ services:
       - THUNDER_PUBLIC_URL=${THUNDER_PUBLIC_URL:-https://localhost:8090}
     volumes:
       - thunder-db:/opt/thunder/repository/database
+      - consent-db:/opt/thunder/consent/repository/database
       - ./.env:/opt/thunder/bootstrap/.env:ro
       - ./01-default-resources.sh:/opt/thunder/bootstrap/01-default-resources.sh
       - ./02-sample-resources.sh:/opt/thunder/bootstrap/02-sample-resources.sh
@@ -36,7 +38,7 @@ services:
 
   # Run Thunder server with the shared database
   thunder:
-    image: ghcr.io/asgardeo/thunder:0.29.0
+    image: ghcr.io/asgardeo/thunder:0.35.0
     depends_on:
       thunder-setup:
         condition: service_completed_successfully
@@ -44,8 +46,11 @@ services:
       - "8090:8090"
     volumes:
       - thunder-db:/opt/thunder/repository/database
+      - consent-db:/opt/thunder/consent/repository/database
       - ./deployment.yaml:/opt/thunder/repository/conf/deployment.yaml
 
 volumes:
   thunder-db:
+    driver: local
+  consent-db:
     driver: local
