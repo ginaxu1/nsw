@@ -23,10 +23,10 @@ export function WorkflowTasksScreen() {
       if (!workflowId) return
       try {
         setLoading(true)
-        const result = await fetchApplications(apiClient, { 
-          workflowId, 
-          page, 
-          pageSize: PAGE_SIZE 
+        const result = await fetchApplications(apiClient, {
+          workflowId,
+          page,
+          pageSize: PAGE_SIZE,
         })
         setApplications(result.items)
         setTotal(result.total)
@@ -45,7 +45,7 @@ export function WorkflowTasksScreen() {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
-      year: 'numeric'
+      year: 'numeric',
     })
   }
 
@@ -63,8 +63,8 @@ export function WorkflowTasksScreen() {
   return (
     <div className="animate-fade-in max-w-6xl mx-auto">
       <div className="mb-6">
-        <Button 
-          variant="ghost" 
+        <Button
+          variant="ghost"
           onClick={() => navigate('/workflows')}
           className="mb-4 -ml-2 text-gray-600 hover:text-blue-600"
         >
@@ -98,15 +98,11 @@ export function WorkflowTasksScreen() {
             <table className="w-full">
               <thead>
                 <tr className="bg-gray-50/50 border-b border-gray-200 text-left">
-                  <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    Task ID
-                  </th>
+                  <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Task ID</th>
                   <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                     Verification Type
                   </th>
-                  <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
+                  <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                   <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                     Last Updated
                   </th>
@@ -116,7 +112,9 @@ export function WorkflowTasksScreen() {
                 {applications.map((app) => (
                   <tr
                     key={app.taskId}
-                    onClick={() => { void navigate(`/workflows/${app.workflowId}?taskId=${app.taskId}`) }}
+                    onClick={() => {
+                      void navigate(`/workflows/${app.workflowId}?taskId=${app.taskId}`)
+                    }}
                     className="hover:bg-blue-50/30 cursor-pointer transition-colors group text-sm"
                   >
                     <td className="px-6 py-4 break-all font-mono text-blue-600 font-medium hover:underline">
@@ -130,19 +128,20 @@ export function WorkflowTasksScreen() {
                       <Badge
                         size="1"
                         color={
-                          app.status === 'APPROVED' ? 'green' :
-                            app.status === 'REJECTED' ? 'red' :
-                              app.status === 'FEEDBACK_REQUESTED' ? 'amber' :
-                                'blue'
+                          app.status === 'APPROVED'
+                            ? 'green'
+                            : app.status === 'REJECTED'
+                              ? 'red'
+                              : app.status === 'FEEDBACK_REQUESTED'
+                                ? 'amber'
+                                : 'blue'
                         }
                         variant="surface"
                       >
                         {app.status}
                       </Badge>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-gray-600">
-                      {formatDateForTable(app.updatedAt)}
-                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-gray-600">{formatDateForTable(app.updatedAt)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -158,20 +157,10 @@ export function WorkflowTasksScreen() {
             Page {page} of {totalPages} ({total} results)
           </Text>
           <div className="flex items-center gap-2">
-            <IconButton
-              size="1"
-              variant="soft"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-            >
+            <IconButton size="1" variant="soft" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
               <ChevronLeftIcon />
             </IconButton>
-            <IconButton
-              size="1"
-              variant="soft"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => p + 1)}
-            >
+            <IconButton size="1" variant="soft" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
               <ChevronRightIcon />
             </IconButton>
           </div>

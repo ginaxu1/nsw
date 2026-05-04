@@ -1,5 +1,5 @@
 import { Card, Text } from '@radix-ui/themes'
-import type {Workflow} from "../../services/types/workflow.ts";
+import type { Workflow } from '../../services/types/workflow.ts'
 
 interface WorkflowCardProps {
   workflow: Workflow
@@ -10,11 +10,7 @@ interface WorkflowCardProps {
 export function WorkflowCard({ workflow, selected, onSelect }: WorkflowCardProps) {
   return (
     <Card
-      className={`cursor-pointer transition-all ${
-        selected
-          ? 'ring-2 ring-blue-500 bg-blue-50'
-          : 'hover:bg-gray-50'
-      }`}
+      className={`cursor-pointer transition-all ${selected ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:bg-gray-50'}`}
       onClick={() => onSelect(workflow)}
     >
       <Text as="div" size="2" weight="bold">

@@ -16,10 +16,7 @@ export interface UseAsyncReturn<T> extends AsyncState<T> {
  * @param asyncFunction - The async function to execute
  * @param immediate - Whether to execute immediately on mount
  */
-export function useAsync<T>(
-  asyncFunction: () => Promise<T>,
-  immediate = true
-): UseAsyncReturn<T> {
+export function useAsync<T>(asyncFunction: () => Promise<T>, immediate = true): UseAsyncReturn<T> {
   const [state, setState] = useState<AsyncState<T>>({
     data: null,
     loading: immediate,

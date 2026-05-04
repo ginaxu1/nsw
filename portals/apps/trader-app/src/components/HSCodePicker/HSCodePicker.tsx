@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { Dialog, Button, Box, Flex, Text, IconButton, Badge } from '@radix-ui/themes'
 import { Cross2Icon, ArrowRightIcon } from '@radix-ui/react-icons'
 import { HSCodeSearch } from './HSCodeSearch'
-import type { HSCode } from "../../services/types/hsCode.ts"
-import type { TradeFlow } from "../../services/types/consignment.ts"
+import type { HSCode } from '../../services/types/hsCode.ts'
+import type { TradeFlow } from '../../services/types/consignment.ts'
 
 interface HSCodePickerProps {
   open: boolean
@@ -98,7 +98,9 @@ export function HSCodePicker({
         <Box style={{ flex: 1 }}>
           {step === 'trade-flow' ? (
             <Flex direction="column" gap="3">
-              <Text size="2" weight="medium" color="gray">Select Trade Flow</Text>
+              <Text size="2" weight="medium" color="gray">
+                Select Trade Flow
+              </Text>
               <Flex direction="column" gap="3">
                 <button
                   onClick={() => handleTradeFlowSelect('IMPORT')}
@@ -141,7 +143,9 @@ export function HSCodePicker({
                 <Badge color={tradeFlow === 'IMPORT' ? 'blue' : 'green'} size="2">
                   {tradeFlow}
                 </Badge>
-                <Text size="1" color="gray">Selected Trade Flow</Text>
+                <Text size="1" color="gray">
+                  Selected Trade Flow
+                </Text>
               </Flex>
 
               {/* HS Code Search */}
@@ -157,15 +161,25 @@ export function HSCodePicker({
                   </Text>
                   <Flex direction="column" gap="2">
                     <Flex gap="2">
-                      <Text size="2" color="gray" style={{ minWidth: '100px' }}>HS Code:</Text>
-                      <Text size="2" weight="medium">{selectedHSCode.hsCode}</Text>
+                      <Text size="2" color="gray" style={{ minWidth: '100px' }}>
+                        HS Code:
+                      </Text>
+                      <Text size="2" weight="medium">
+                        {selectedHSCode.hsCode}
+                      </Text>
                     </Flex>
                     <Flex gap="2">
-                      <Text size="2" color="gray" style={{ minWidth: '100px' }}>Description:</Text>
-                      <Text size="2" className="text-gray-700" style={{ flex: 1 }}>{selectedHSCode.description}</Text>
+                      <Text size="2" color="gray" style={{ minWidth: '100px' }}>
+                        Description:
+                      </Text>
+                      <Text size="2" className="text-gray-700" style={{ flex: 1 }}>
+                        {selectedHSCode.description}
+                      </Text>
                     </Flex>
                     <Flex gap="2">
-                      <Text size="2" color="gray" style={{ minWidth: '100px' }}>Trade Flow:</Text>
+                      <Text size="2" color="gray" style={{ minWidth: '100px' }}>
+                        Trade Flow:
+                      </Text>
                       <Text size="2" weight="medium" style={{ textTransform: 'uppercase' }}>
                         {tradeFlow}
                       </Text>
@@ -189,11 +203,7 @@ export function HSCodePicker({
             </Button>
           </Dialog.Close>
           {step === 'hs-code' && (
-            <Button
-              onClick={handleConfirm}
-              disabled={!selectedHSCode || isCreating}
-              loading={isCreating}
-            >
+            <Button onClick={handleConfirm} disabled={!selectedHSCode || isCreating} loading={isCreating}>
               {isCreating ? 'Creating...' : confirmText}
             </Button>
           )}

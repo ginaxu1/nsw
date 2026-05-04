@@ -16,10 +16,10 @@ This guide helps you set up a consistent development environment for the NSW Por
 
 This project uses **strict version enforcement** to ensure consistent dependency resolution and lockfile generation across all team members.
 
-| Tool | Required Version | Why? |
-|------|-----------------|------|
-| **Node.js** | `v22.18.0` | Locked to prevent lockfile inconsistencies |
-| **pnpm** | `v10.28.1` | Enforced via `packageManager` field |
+| Tool        | Required Version | Why?                                       |
+| ----------- | ---------------- | ------------------------------------------ |
+| **Node.js** | `v22.18.0`       | Locked to prevent lockfile inconsistencies |
+| **pnpm**    | `v10.28.1`       | Enforced via `packageManager` field        |
 
 > **⚠️ Important**: Using different versions will cause `pnpm-lock.yaml` to change unexpectedly, creating merge conflicts and CI failures.
 
@@ -38,6 +38,7 @@ Follow these steps if you're setting up the project for the first time.
 ### Step 1: Install Node Version Manager (nvm)
 
 **macOS/Linux:**
+
 ```bash
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
 
@@ -46,6 +47,7 @@ nvm --version
 ```
 
 **Windows:**
+
 - Download and install [nvm-windows](https://github.com/coreybutler/nvm-windows/releases)
 - Or use [Volta](https://volta.sh/) as an alternative
 
@@ -84,6 +86,7 @@ pnpm --version
 ```
 
 **Alternative (manual installation):**
+
 ```bash
 npm install -g pnpm@10.28.1
 ```
@@ -103,6 +106,7 @@ pnpm install
 ```
 
 **You may see a build scripts warning:**
+
 ```
 ╭ Warning ───────────────────────────────────────────────────────────────╮
 │ Ignored build scripts: @swc/core@1.15.10, esbuild@0.27.2.              │
@@ -159,6 +163,7 @@ Follow these steps if you're already working on the project and need to migrate 
 ### Why Migrate?
 
 You may experience:
+
 - ❌ `pnpm-lock.yaml` changes on every `pnpm install`
 - ❌ Lockfile conflicts with teammates
 - ❌ CI/CD failures due to lockfile mismatches
@@ -285,6 +290,7 @@ ERR_PNPM_BAD_NODE_VERSION  Unsupported Node.js version
 ```
 
 **Solution:**
+
 ```bash
 # You're not using the correct Node version
 nvm use
@@ -298,6 +304,7 @@ node --version  # Must be v22.18.0
 ### Problem: Build scripts warning during `pnpm install`
 
 **Symptoms:**
+
 ```
 Ignored build scripts: @swc/core@1.15.10, esbuild@0.27.2.
 Run "pnpm approve-builds" to pick which packages should be allowed...
@@ -307,6 +314,7 @@ Run "pnpm approve-builds" to pick which packages should be allowed...
 pnpm security feature that prevents packages from running scripts without approval.
 
 **Solution:**
+
 ```bash
 # Approve the build scripts
 pnpm approve-builds
@@ -327,11 +335,13 @@ pnpm approve-builds
 ### Problem: `pnpm-lock.yaml` keeps changing
 
 **Symptoms:**
+
 - Running `pnpm install` modifies the lockfile
 - Lines like `libc: [glibc]` appear/disappear
 - Lockfile conflicts with teammates
 
 **Solution:**
+
 ```bash
 # 1. Verify Node version
 node --version
@@ -358,10 +368,12 @@ git diff pnpm-lock.yaml
 ### Problem: `Cannot find module '@opennsw/ui'`
 
 **Symptoms:**
+
 - TypeScript or runtime errors about missing `@opennsw/ui` module
 - Import statements fail
 
 **Solution:**
+
 ```bash
 # The UI library needs to be built first
 make build-ui
@@ -375,6 +387,7 @@ pnpm --filter @opennsw/ui build
 ### Problem: `pnpm: command not found`
 
 **Solution:**
+
 ```bash
 # Enable Corepack
 corepack enable
@@ -388,6 +401,7 @@ npm install -g pnpm@10.28.1
 ### Problem: Different behavior between team members
 
 **Symptoms:**
+
 - Works on one machine, fails on another
 - Different test results or build outputs
 
@@ -471,6 +485,7 @@ node --version && pnpm --version
 ```
 
 Compare outputs. Everyone should have:
+
 - Node: `v22.18.0`
 - pnpm: `10.28.1`
 
@@ -497,6 +512,7 @@ make build-ui
 ### Contact the Team
 
 If you're still stuck:
+
 1. Share your verification checklist output
 2. Share `git diff pnpm-lock.yaml` output
 3. Ask in the team channel
@@ -517,10 +533,12 @@ If you're still stuck:
 Always keep your Node.js and pnpm versions up to date with security patches. The team will coordinate version updates through pull requests to ensure everyone stays synchronized.
 
 **Current versions locked as of:** January 2026
+
 - Node.js: v22.18.0
 - pnpm: v10.28.1
 
 When updating these versions, the team lead will:
+
 1. Update `.nvmrc`
 2. Update `package.json` `packageManager` field
 3. Update `.npmrc` if needed
@@ -532,20 +550,24 @@ When updating these versions, the team lead will:
 This section tracks recommended future upgrades and the migration process.
 
 ### Current Status (Jan 2026)
+
 - **Node.js:** `v22.18.0` (Locked)
 - **pnpm:** `v10.28.1` (Locked)
 
 ### How to Update (Maintainer Guide)
+
 et's say we're going to `Update Node.js from v22.18.0 to v24.13.0` and `Update pnpm from 10.28.1 to 10.28.2`
 
 #### Step 1: Update Node.js to v24.13.0
 
 1. **Update `.nvmrc`:**
+
    ```bash
    echo "24.13.0" > .nvmrc
    ```
 
 2. **Update `package.json` engines:**
+
    ```json
    {
      "engines": {
@@ -609,6 +631,7 @@ git diff pnpm-lock.yaml
 #### Step 5: Update Documentation
 
 Update version numbers in:
+
 - This file (SETUP_WORKSPACE.md)
 - README.md (if version numbers are mentioned)
 - Any CI/CD configuration files
@@ -668,6 +691,7 @@ pnpm install
 5. **👥 Coordinate rollout** - Pick a time when team can update together
 
 **Next steps:**
+
 1. Discuss with team lead
 2. Create upgrade branch
 3. Test locally

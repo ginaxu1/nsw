@@ -1,10 +1,10 @@
-import {StrictMode, type ComponentProps, type ReactElement} from 'react'
-import {createRoot} from 'react-dom/client'
+import { StrictMode, type ComponentProps, type ReactElement } from 'react'
+import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
-import "@radix-ui/themes/styles.css";
-import {BrowserRouter} from 'react-router-dom';
-import {Theme} from '@radix-ui/themes';
+import '@radix-ui/themes/styles.css'
+import { BrowserRouter } from 'react-router-dom'
+import { Theme } from '@radix-ui/themes'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { AsgardeoProvider } from '@asgardeo/react'
 import { getEnv } from './runtimeConfig'
@@ -29,7 +29,7 @@ const IDP_PLATFORM = normalizeIdpPlatform(getEnv('VITE_IDP_PLATFORM', 'AsgardeoV
 const rawScopes = getEnv('VITE_IDP_SCOPES')
 const IDP_SCOPES = rawScopes
   ? rawScopes.split(',').map((s: string) => s.trim())
-  : ["openid", "profile", "group", "email"]
+  : ['openid', 'profile', 'group', 'email']
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -46,7 +46,7 @@ createRoot(document.getElementById('root')!).render(
       >
         <Theme>
           <BrowserRouter>
-            <App/>
+            <App />
           </BrowserRouter>
         </Theme>
       </TraderAsgardeoProvider>

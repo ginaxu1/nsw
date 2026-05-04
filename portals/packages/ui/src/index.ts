@@ -1,4 +1,4 @@
-import './index.css';
+import './index.css'
 
-export * from './components/Button';
-export * from './components/Card';
+export * from './components/Button'
+export * from './components/Card'

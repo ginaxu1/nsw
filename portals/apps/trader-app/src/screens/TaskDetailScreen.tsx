@@ -6,7 +6,6 @@ import { getTaskInfo } from '../services/task'
 import { useApi } from '../services/ApiContext'
 import PluginRenderer, { type RenderInfo } from '../plugins'
 
-
 export function TaskDetailScreen() {
   const { taskId } = useParams<{
     taskId: string
@@ -40,7 +39,6 @@ export function TaskDetailScreen() {
   useEffect(() => {
     fetchTask()
   }, [fetchTask])
-
 
   if (loading) {
     return (

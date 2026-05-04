@@ -23,7 +23,9 @@ make help       # See all available commands
 ```
 
 ### 📚 New to the Project?
+
 See **[SETUP_WORKSPACE.md](docs/SETUP_WORKSPACE.md)** for:
+
 - Complete setup instructions (new developers & existing team migration)
 - Version requirements and enforcement
 - Troubleshooting common issues
@@ -57,12 +59,14 @@ portals/
 The `ui` package is a shared component library built from the ground up using [Radix UI](https://www.radix-ui.com/) primitives. It provides accessible, unstyled, and customizable components that can be consumed by any application in the monorepo.
 
 **Key features:**
+
 - Built on Radix UI primitives for accessibility and flexibility
 - React 19 support
 - TypeScript-first approach
 - Bundled with Vite for ESM and CJS outputs
 
 **Available components:**
+
 - `Button`
 - `Card`
 
@@ -71,6 +75,7 @@ The `ui` package is a shared component library built from the ground up using [R
 The `apps/` directory contains applications that consume the shared UI library. Each app is a standalone project that imports components from `@opennsw/ui`.
 
 **Current apps:**
+
 - `oga-app` - OGA portal application
 - `trader-app` - Trading application
 
@@ -140,7 +145,7 @@ function MyComponent() {
    ```json
    {
      "dependencies": {
-      "@opennsw/ui": "workspace:*"
+       "@opennsw/ui": "workspace:*"
      }
    }
    ```

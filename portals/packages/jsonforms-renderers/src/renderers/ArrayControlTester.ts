@@ -1,6 +1,3 @@
-import { rankWith, isObjectArrayControl } from '@jsonforms/core';
+import { rankWith, isObjectArrayControl } from '@jsonforms/core'
 
-export const ArrayControlTester = rankWith(
-    3,
-    isObjectArrayControl
-);
+export const ArrayControlTester = rankWith(3, isObjectArrayControl)

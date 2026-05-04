@@ -8,10 +8,7 @@ export interface WorkflowResponse {
 
 const WORKFLOW_TEMPLATES_ENDPOINT = '/workflows/templates'
 
-export async function getWorkflowsByHSCode(
-  params: WorkflowQueryParams
-): Promise<WorkflowResponse> {
-
+export async function getWorkflowsByHSCode(params: WorkflowQueryParams): Promise<WorkflowResponse> {
   // Fetch import and export workflows in parallel
   const [importWorkflow, exportWorkflow] = await Promise.all([
     fetchWorkflowByType(params.hs_code, 'IMPORT'),
@@ -24,10 +21,7 @@ export async function getWorkflowsByHSCode(
   }
 }
 
-async function fetchWorkflowByType(
-  hsCode: string,
-  tradeFlow: 'IMPORT' | 'EXPORT'
-): Promise<Workflow | null> {
+async function fetchWorkflowByType(hsCode: string, tradeFlow: 'IMPORT' | 'EXPORT'): Promise<Workflow | null> {
   try {
     const template = await apiGet<WorkflowTemplate>(WORKFLOW_TEMPLATES_ENDPOINT, {
       hsCode,

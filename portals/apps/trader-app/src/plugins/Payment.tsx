@@ -1,9 +1,9 @@
-import { useState } from "react"
-import { useParams } from "react-router-dom"
-import { Box, Button, Dialog, Flex, IconButton, Text } from "@radix-ui/themes"
-import { Cross2Icon } from "@radix-ui/react-icons"
-import { useApi } from "../services/ApiContext"
-import { getTaskInfo, sendTaskAction, type TaskCommandResponse } from "../services/task"
+import { useState } from 'react'
+import { useParams } from 'react-router-dom'
+import { Box, Button, Dialog, Flex, IconButton, Text } from '@radix-ui/themes'
+import { Cross2Icon } from '@radix-ui/react-icons'
+import { useApi } from '../services/ApiContext'
+import { getTaskInfo, sendTaskAction, type TaskCommandResponse } from '../services/task'
 
 type BreakDown = {
   description: string
@@ -18,7 +18,7 @@ export type PaymentConfigs = {
   gatewayUrl: string
   totalAmount: number
   currency: string
-  breakdown: BreakDown[];
+  breakdown: BreakDown[]
 }
 
 export default function Payment(props: {
@@ -39,8 +39,8 @@ export default function Payment(props: {
   const api = useApi()
 
   const workflowId = preConsignmentId || consignmentId
-  const isCompleted = props.pluginState === "COMPLETED"
-  const gatewayUrl = props.configs?.gatewayUrl ?? ""
+  const isCompleted = props.pluginState === 'COMPLETED'
+  const gatewayUrl = props.configs?.gatewayUrl ?? ''
 
   const refreshGatewaySession = async () => {
     if (!taskId) {
@@ -50,7 +50,7 @@ export default function Payment(props: {
     try {
       await getTaskInfo(taskId, api)
     } catch (err) {
-      console.error("Error refreshing payment session:", err)
+      console.error('Error refreshing payment session:', err)
     }
   }
 
@@ -59,25 +59,25 @@ export default function Payment(props: {
       return false
     }
 
-    const code = response.error?.code ?? ""
-    const message = response.error?.message?.toLowerCase() ?? ""
-    return code === "SESSION_EXPIRED" || message.includes("session expired")
+    const code = response.error?.code ?? ''
+    const message = response.error?.message?.toLowerCase() ?? ''
+    return code === 'SESSION_EXPIRED' || message.includes('session expired')
   }
 
   const isSessionExpiredError = (err: unknown): boolean => {
     const message = err instanceof Error ? err.message : String(err)
-    return message.toLowerCase().includes("session expired")
+    return message.toLowerCase().includes('session expired')
   }
 
   const handlePayNow = async () => {
     if (!workflowId || !taskId) {
-      setSubmitError("Workflow ID or Task ID is missing.")
+      setSubmitError('Workflow ID or Task ID is missing.')
       return
     }
 
-    if (props.pluginState === "IN_PROGRESS") {
+    if (props.pluginState === 'IN_PROGRESS') {
       if (!gatewayUrl) {
-        setSubmitError("Gateway URL is not available.")
+        setSubmitError('Gateway URL is not available.')
         return
       }
 
@@ -88,7 +88,7 @@ export default function Payment(props: {
 
     const initiatePayment = async (allowRetry: boolean): Promise<boolean> => {
       try {
-        const response = await sendTaskAction(taskId, workflowId, "INITIATE_PAYMENT")
+        const response = await sendTaskAction(taskId, workflowId, 'INITIATE_PAYMENT')
         if (response.success) {
           return true
         }
@@ -98,7 +98,7 @@ export default function Payment(props: {
           return initiatePayment(false)
         }
 
-        setSubmitError(response.error?.message ?? "Failed to initiate payment.")
+        setSubmitError(response.error?.message ?? 'Failed to initiate payment.')
         return false
       } catch (err) {
         if (allowRetry && isSessionExpiredError(err)) {
@@ -106,8 +106,8 @@ export default function Payment(props: {
           return initiatePayment(false)
         }
 
-        console.error("Error initiating payment:", err)
-        setSubmitError("Failed to initiate payment. Please try again.")
+        console.error('Error initiating payment:', err)
+        setSubmitError('Failed to initiate payment. Please try again.')
         return false
       }
     }
@@ -127,9 +127,9 @@ export default function Payment(props: {
     }
   }
 
-  const handleMockGatewayResult = async (action: "PAYMENT_SUCCESS" | "PAYMENT_FAILED") => {
+  const handleMockGatewayResult = async (action: 'PAYMENT_SUCCESS' | 'PAYMENT_FAILED') => {
     if (!workflowId || !taskId) {
-      setSubmitError("Workflow ID or Task ID is missing.")
+      setSubmitError('Workflow ID or Task ID is missing.')
       return
     }
 
@@ -139,7 +139,7 @@ export default function Payment(props: {
     try {
       const response = await sendTaskAction(taskId, workflowId, action)
       if (!response.success) {
-        setSubmitError(response.error?.message ?? "Failed to process payment result.")
+        setSubmitError(response.error?.message ?? 'Failed to process payment result.')
         return
       }
 
@@ -149,8 +149,8 @@ export default function Payment(props: {
         await props.onTaskUpdated()
       }
     } catch (err) {
-      console.error("Error processing payment result:", err)
-      setSubmitError("Failed to process payment result. Please try again.")
+      console.error('Error processing payment result:', err)
+      setSubmitError('Failed to process payment result. Please try again.')
     } finally {
       setIsProcessingResult(false)
     }
@@ -161,42 +161,51 @@ export default function Payment(props: {
       {/* Payment Breakdown Table */}
       <Box className="border border-gray-200 rounded-lg overflow-hidden">
         <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
-          <Text size="2" weight="bold" color="gray">Payment Breakdown</Text>
+          <Text size="2" weight="bold" color="gray">
+            Payment Breakdown
+          </Text>
         </div>
         <div className="p-0">
           <table className="w-full text-left text-sm">
             <thead>
-            <tr className="border-b border-gray-100 bg-gray-50/50">
-              <th className="px-4 py-2 font-semibold text-gray-600">Description</th>
-              <th className="px-4 py-2 font-semibold text-gray-600 text-right">Details</th>
-              <th className="px-4 py-2 font-semibold text-gray-600 text-right">Amount ({props.configs.currency})</th>
-            </tr>
+              <tr className="border-b border-gray-100 bg-gray-50/50">
+                <th className="px-4 py-2 font-semibold text-gray-600">Description</th>
+                <th className="px-4 py-2 font-semibold text-gray-600 text-right">Details</th>
+                <th className="px-4 py-2 font-semibold text-gray-600 text-right">Amount ({props.configs.currency})</th>
+              </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-            {props.configs.breakdown.map((item, idx) => (
-              <tr key={idx} className="hover:bg-gray-50/30 transition-colors">
-                <td className="px-4 py-3 text-gray-800 font-medium">{item.description}</td>
-                <td className="px-4 py-3 text-right text-gray-500 text-xs">
-                  {item.type === "FIXED" ? (
-                    <>{item.quantity} × {item.unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}</>
-                  ) : (
-                    <span className="italic">Calculated based on running total</span>
-                  )}
-                </td>
-                <td className={`px-4 py-3 text-right font-mono ${item.category === 'DEDUCTION' ? 'text-red-600' : 'text-gray-900'}`}>
-                  {item.category === 'DEDUCTION' ? '-' : ''}
-                  {item.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                </td>
-              </tr>
-            ))}
+              {props.configs.breakdown.map((item, idx) => (
+                <tr key={idx} className="hover:bg-gray-50/30 transition-colors">
+                  <td className="px-4 py-3 text-gray-800 font-medium">{item.description}</td>
+                  <td className="px-4 py-3 text-right text-gray-500 text-xs">
+                    {item.type === 'FIXED' ? (
+                      <>
+                        {item.quantity} × {item.unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </>
+                    ) : (
+                      <span className="italic">Calculated based on running total</span>
+                    )}
+                  </td>
+                  <td
+                    className={`px-4 py-3 text-right font-mono ${item.category === 'DEDUCTION' ? 'text-red-600' : 'text-gray-900'}`}
+                  >
+                    {item.category === 'DEDUCTION' ? '-' : ''}
+                    {item.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </td>
+                </tr>
+              ))}
             </tbody>
             <tfoot>
-            <tr className="bg-blue-50/50">
-              <td colSpan={2} className="px-4 py-4 text-right font-bold text-blue-900 uppercase tracking-wider">Total Payable</td>
-              <td className="px-4 py-4 text-right text-lg font-black text-blue-900 font-mono">
-                {props.configs.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} {props.configs.currency}
-              </td>
-            </tr>
+              <tr className="bg-blue-50/50">
+                <td colSpan={2} className="px-4 py-4 text-right font-bold text-blue-900 uppercase tracking-wider">
+                  Total Payable
+                </td>
+                <td className="px-4 py-4 text-right text-lg font-black text-blue-900 font-mono">
+                  {props.configs.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}{' '}
+                  {props.configs.currency}
+                </td>
+              </tr>
             </tfoot>
           </table>
         </div>
@@ -204,12 +213,21 @@ export default function Payment(props: {
       <h1 className="text-2xl font-bold text-gray-800">Payment</h1>
 
       <div className="text-sm text-gray-700">
-  		{isCompleted ? "Paid Amount" : "Amount"}: <span className="font-medium">{props.configs.totalAmount} {props.configs.currency}</span>
+        {isCompleted ? 'Paid Amount' : 'Amount'}:{' '}
+        <span className="font-medium">
+          {props.configs.totalAmount} {props.configs.currency}
+        </span>
       </div>
 
       {!isCompleted && (
-        <Button onClick={() => { void handlePayNow() }} disabled={isInitiating} size="3">
-          {isInitiating ? "Initiating..." : "Pay Now"}
+        <Button
+          onClick={() => {
+            void handlePayNow()
+          }}
+          disabled={isInitiating}
+          size="3"
+        >
+          {isInitiating ? 'Initiating...' : 'Pay Now'}
         </Button>
       )}
 
@@ -231,13 +249,19 @@ export default function Payment(props: {
 
           <Box mt="4" className="space-y-3">
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <Text size="2" color="gray">Popup URL</Text>
+              <Text size="2" color="gray">
+                Popup URL
+              </Text>
               <p className="text-sm text-gray-900 break-all mt-1">{gatewayUrl}</p>
             </div>
 
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <Text size="2" color="gray">Amount</Text>
-              <p className="text-sm text-gray-900 mt-1">{props.configs.totalAmount} {props.configs.currency}</p>
+              <Text size="2" color="gray">
+                Amount
+              </Text>
+              <p className="text-sm text-gray-900 mt-1">
+                {props.configs.totalAmount} {props.configs.currency}
+              </p>
             </div>
           </Box>
 
@@ -246,16 +270,20 @@ export default function Payment(props: {
               variant="soft"
               color="red"
               disabled={isProcessingResult}
-              onClick={() => { void handleMockGatewayResult("PAYMENT_FAILED") }}
+              onClick={() => {
+                void handleMockGatewayResult('PAYMENT_FAILED')
+              }}
             >
-              {isProcessingResult ? "Processing..." : "Mark Failed"}
+              {isProcessingResult ? 'Processing...' : 'Mark Failed'}
             </Button>
             <Button
               color="green"
               disabled={isProcessingResult}
-              onClick={() => { void handleMockGatewayResult("PAYMENT_SUCCESS") }}
+              onClick={() => {
+                void handleMockGatewayResult('PAYMENT_SUCCESS')
+              }}
             >
-              {isProcessingResult ? "Processing..." : "Mark Success"}
+              {isProcessingResult ? 'Processing...' : 'Mark Success'}
             </Button>
           </Flex>
         </Dialog.Content>

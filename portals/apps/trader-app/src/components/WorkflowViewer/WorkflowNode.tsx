@@ -84,7 +84,7 @@ export function WorkflowNode({ data }: NodeProps<WorkflowNodeType>) {
     bgColor: 'bg-gray-50',
     borderColor: 'border-gray-300',
     textColor: 'text-gray-500',
-    iconColor: 'text-gray-400'
+    iconColor: 'text-gray-400',
   }
 
   const isExecutable = step.state === 'READY'
@@ -143,15 +143,11 @@ export function WorkflowNode({ data }: NodeProps<WorkflowNodeType>) {
 
   return (
     <div
-      className={`px-3 py-2 rounded-lg border-2 hover:cursor-default shadow-sm w-72 min-h-[80px] flex flex-col justify-center ${statusStyle.bgColor
-        } ${statusStyle.borderColor} ${step.state === 'READY' ? 'ring-2 ring-blue-300 ring-offset-2' : ''
-        }`}
+      className={`px-3 py-2 rounded-lg border-2 hover:cursor-default shadow-sm w-72 min-h-[80px] flex flex-col justify-center ${
+        statusStyle.bgColor
+      } ${statusStyle.borderColor} ${step.state === 'READY' ? 'ring-2 ring-blue-300 ring-offset-2' : ''}`}
     >
-      <Handle
-        type="target"
-        position={Position.Top}
-        className="bg-slate-400! w-3! h-3!"
-      />
+      <Handle type="target" position={Position.Top} className="bg-slate-400! w-3! h-3!" />
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-start gap-2 flex-1 min-w-0">
           <div className={`mt-0.5 shrink-0 ${statusStyle.iconColor}`}>
@@ -168,17 +164,14 @@ export function WorkflowNode({ data }: NodeProps<WorkflowNodeType>) {
               </Text>
             </Tooltip>
             <div>
-
               <Text size="1" className={`${statusStyle.textColor} font-mono mt-0.5 text-xs`}>
                 {step.state}
               </Text>
             </div>
             <div>
-              {step.state === "IN_PROGRESS" &&
-                <div className={`${statusStyle.textColor} mt-0.5 text-[0.5rem] italic`}>
-                  {step.extendedState}
-                </div>
-              }
+              {step.state === 'IN_PROGRESS' && (
+                <div className={`${statusStyle.textColor} mt-0.5 text-[0.5rem] italic`}>{step.extendedState}</div>
+              )}
             </div>
           </div>
         </div>
@@ -190,11 +183,7 @@ export function WorkflowNode({ data }: NodeProps<WorkflowNodeType>) {
             className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white shadow-md hover:cursor-pointer hover:shadow-lg transition-all duration-150 shrink-0 disabled:bg-slate-400 disabled:cursor-not-allowed"
             title="Execute task"
           >
-            {isLoading ? (
-              <UpdateIcon className="w-4 h-4 animate-spin" />
-            ) : (
-              <PlayIcon className="w-4 h-4 ml-0.5" />
-            )}
+            {isLoading ? <UpdateIcon className="w-4 h-4 animate-spin" /> : <PlayIcon className="w-4 h-4 ml-0.5" />}
           </button>
         )}
 
@@ -205,20 +194,12 @@ export function WorkflowNode({ data }: NodeProps<WorkflowNodeType>) {
             className={`flex items-center justify-center w-8 h-8 rounded-full ${getViewButtonColors()} text-white shadow-md hover:cursor-pointer hover:shadow-lg transition-all duration-150 shrink-0 disabled:bg-slate-400 disabled:cursor-not-allowed`}
             title="View task"
           >
-            {isLoading ? (
-              <UpdateIcon className="w-4 h-4 animate-spin" />
-            ) : (
-              <ReaderIcon className="w-4 h-4" />
-            )}
+            {isLoading ? <UpdateIcon className="w-4 h-4 animate-spin" /> : <ReaderIcon className="w-4 h-4" />}
           </button>
         )}
       </div>
 
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        className="bg-slate-400! w-3! h-3!"
-      />
+      <Handle type="source" position={Position.Bottom} className="bg-slate-400! w-3! h-3!" />
     </div>
   )
 }

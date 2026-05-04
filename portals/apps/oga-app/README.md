@@ -53,9 +53,9 @@ OGA instance branding and feature configuration is defined via YAML files.
 
 ```yaml
 branding:
-  appName: "My OGA Name"       # Required
-  logoUrl: ""                   # Optional
-  favicon: ""                   # Optional
+  appName: 'My OGA Name' # Required
+  logoUrl: '' # Optional
+  favicon: '' # Optional
 ```
 
 ## Local development

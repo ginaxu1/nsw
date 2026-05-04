@@ -1,11 +1,17 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Badge, Spinner, Text, Card, Flex, Box, Callout, Tabs } from '@radix-ui/themes'
-import { ArrowLeftIcon, CheckCircledIcon, ExclamationTriangleIcon, InfoCircledIcon, ChatBubbleIcon } from '@radix-ui/react-icons'
+import {
+  ArrowLeftIcon,
+  CheckCircledIcon,
+  ExclamationTriangleIcon,
+  InfoCircledIcon,
+  ChatBubbleIcon,
+} from '@radix-ui/react-icons'
 import { fetchApplicationDetail, submitReview, submitFeedback, type OGAApplication } from '../api'
-import { JsonForms } from '@jsonforms/react';
-import { radixRenderers } from '@opennsw/jsonforms-renderers';
-import type { JsonSchema, UISchemaElement } from '@jsonforms/core';
+import { JsonForms } from '@jsonforms/react'
+import { radixRenderers } from '@opennsw/jsonforms-renderers'
+import type { JsonSchema, UISchemaElement } from '@jsonforms/core'
 import { useApi } from '../services/useApi'
 
 export function WorkflowDetailScreen() {
@@ -46,14 +52,14 @@ export function WorkflowDetailScreen() {
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault()
     if (!taskId || !application) {
       setError('Application data not available')
       return
     }
     if (formErrors.length > 0) {
-      setError('Please fix validation errors before submitting.');
-      return;
+      setError('Please fix validation errors before submitting.')
+      return
     }
     setIsSubmitting(true)
     setError(null)
@@ -98,7 +104,9 @@ export function WorkflowDetailScreen() {
     return (
       <Flex align="center" justify="center" py="9">
         <Spinner size="3" />
-        <Text size="3" color="gray" ml="3">Loading application details...</Text>
+        <Text size="3" color="gray" ml="3">
+          Loading application details...
+        </Text>
       </Flex>
     )
   }
@@ -107,10 +115,18 @@ export function WorkflowDetailScreen() {
     return (
       <Box p="6">
         <Callout.Root color="red">
-          <Callout.Icon><ExclamationTriangleIcon /></Callout.Icon>
+          <Callout.Icon>
+            <ExclamationTriangleIcon />
+          </Callout.Icon>
           <Callout.Text>{error}</Callout.Text>
         </Callout.Root>
-        <Button variant="soft" mt="4" onClick={() => { void navigate('/workflows') }}>
+        <Button
+          variant="soft"
+          mt="4"
+          onClick={() => {
+            void navigate('/workflows')
+          }}
+        >
           <ArrowLeftIcon /> Back to List
         </Button>
       </Box>
@@ -121,10 +137,18 @@ export function WorkflowDetailScreen() {
     return (
       <Box p="6">
         <Callout.Root color="red">
-          <Callout.Icon><ExclamationTriangleIcon /></Callout.Icon>
+          <Callout.Icon>
+            <ExclamationTriangleIcon />
+          </Callout.Icon>
           <Callout.Text>Application not found</Callout.Text>
         </Callout.Root>
-        <Button variant="soft" mt="4" onClick={() => { void navigate('/workflows') }}>
+        <Button
+          variant="soft"
+          mt="4"
+          onClick={() => {
+            void navigate('/workflows')
+          }}
+        >
           <ArrowLeftIcon /> Back to List
         </Button>
       </Box>
@@ -134,15 +158,25 @@ export function WorkflowDetailScreen() {
   const isActionable = application.status === 'PENDING'
   const feedbackCount = application.feedbackHistory?.length ?? 0
 
-  const statusColor = application.status === 'APPROVED' ? 'green'
-    : application.status === 'REJECTED' ? 'red'
-      : application.status === 'FEEDBACK_REQUESTED' ? 'amber'
-        : 'blue'
+  const statusColor =
+    application.status === 'APPROVED'
+      ? 'green'
+      : application.status === 'REJECTED'
+        ? 'red'
+        : application.status === 'FEEDBACK_REQUESTED'
+          ? 'amber'
+          : 'blue'
 
   return (
     <div className="animate-fade-in max-w-5xl mx-auto">
       <Flex justify="between" align="center" mb="6">
-        <Button variant="ghost" color="gray" onClick={() => { void navigate('/workflows') }}>
+        <Button
+          variant="ghost"
+          color="gray"
+          onClick={() => {
+            void navigate('/workflows')
+          }}
+        >
           <ArrowLeftIcon /> Back to Workflows
         </Button>
         <Badge size="2" color={statusColor} highContrast>
@@ -152,14 +186,18 @@ export function WorkflowDetailScreen() {
 
       {error && (
         <Callout.Root color="red" mb="6">
-          <Callout.Icon><ExclamationTriangleIcon /></Callout.Icon>
+          <Callout.Icon>
+            <ExclamationTriangleIcon />
+          </Callout.Icon>
           <Callout.Text>{error}</Callout.Text>
         </Callout.Root>
       )}
 
       {success && (
         <Callout.Root color="green" mb="6">
-          <Callout.Icon><CheckCircledIcon /></Callout.Icon>
+          <Callout.Icon>
+            <CheckCircledIcon />
+          </Callout.Icon>
           <Callout.Text>Review submitted successfully! Redirecting...</Callout.Text>
         </Callout.Root>
       )}
@@ -173,32 +211,60 @@ export function WorkflowDetailScreen() {
             </Text>
             <div className="space-y-4 mt-4">
               <Box>
-                <Text size="1" color="gray" as="div" mb="1">Workflow ID</Text>
-                <Text size="2" weight="medium" className="break-all font-mono">{application.workflowId}</Text>
+                <Text size="1" color="gray" as="div" mb="1">
+                  Workflow ID
+                </Text>
+                <Text size="2" weight="medium" className="break-all font-mono">
+                  {application.workflowId}
+                </Text>
               </Box>
               <Box>
-                <Text size="1" color="gray" as="div" mb="1">Status</Text>
-                <Badge size="2" color={statusColor}>{application.status}</Badge>
+                <Text size="1" color="gray" as="div" mb="1">
+                  Status
+                </Text>
+                <Badge size="2" color={statusColor}>
+                  {application.status}
+                </Badge>
               </Box>
               <Box>
-                <Text size="1" color="gray" as="div" mb="1">Submitted On</Text>
+                <Text size="1" color="gray" as="div" mb="1">
+                  Submitted On
+                </Text>
                 <Text size="2" weight="medium">
                   {(() => {
                     const date = new Date(application.createdAt)
-                    const datePart = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-                    const timePart = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+                    const datePart = date.toLocaleDateString('en-US', {
+                      month: 'long',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })
+                    const timePart = date.toLocaleTimeString('en-US', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: true,
+                    })
                     return `${datePart} at ${timePart}`
                   })()}
                 </Text>
               </Box>
               {application.reviewedAt && (
                 <Box>
-                  <Text size="1" color="gray" as="div" mb="1">Reviewed On</Text>
+                  <Text size="1" color="gray" as="div" mb="1">
+                    Reviewed On
+                  </Text>
                   <Text size="2" weight="medium">
                     {(() => {
                       const date = new Date(application.reviewedAt)
-                      const datePart = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-                      const timePart = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+                      const datePart = date.toLocaleDateString('en-US', {
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })
+                      const timePart = date.toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: true,
+                      })
                       return `${datePart} at ${timePart}`
                     })()}
                   </Text>
@@ -212,7 +278,9 @@ export function WorkflowDetailScreen() {
               <Text size="2" weight="bold" color="gray" mb="3" as="div" className="uppercase tracking-wider">
                 Reviewer Notes
               </Text>
-              <Text size="2" className="whitespace-pre-wrap">{application.reviewerNotes}</Text>
+              <Text size="2" className="whitespace-pre-wrap">
+                {application.reviewerNotes}
+              </Text>
             </Card>
           )}
         </div>
@@ -225,16 +293,20 @@ export function WorkflowDetailScreen() {
                 <Callout.Icon>
                   {application.status === 'APPROVED' ? <CheckCircledIcon /> : <ExclamationTriangleIcon />}
                 </Callout.Icon>
-                <Callout.Text>
-                  This application has been {application.status.toLowerCase()}.
-                </Callout.Text>
+                <Callout.Text>This application has been {application.status.toLowerCase()}.</Callout.Text>
               </Callout.Root>
             )}
 
             {/* Submitted Information — always visible, above the tab bar */}
             <div className="bg-gray-50 rounded-lg p-5 border border-gray-200 mb-5">
-              <Text size="2" weight="bold" color="gray" mb="4" as="div"
-                className="uppercase tracking-wider flex items-center gap-2">
+              <Text
+                size="2"
+                weight="bold"
+                color="gray"
+                mb="4"
+                as="div"
+                className="uppercase tracking-wider flex items-center gap-2"
+              >
                 <InfoCircledIcon />
                 Submitted Information
               </Text>
@@ -250,7 +322,7 @@ export function WorkflowDetailScreen() {
                         readonly={true}
                       />
                     </Box>
-                  );
+                  )
                 }
 
                 if (application.data && Object.keys(application.data).length > 0) {
@@ -267,14 +339,14 @@ export function WorkflowDetailScreen() {
                         </Box>
                       ))}
                     </div>
-                  );
+                  )
                 }
 
                 return (
                   <Text size="2" color="gray" className="italic text-center py-2">
                     No submission data available
                   </Text>
-                );
+                )
               })()}
             </div>
 
@@ -303,61 +375,66 @@ export function WorkflowDetailScreen() {
                 {/* Review Tab */}
                 <Tabs.Content value="review">
                   {ogaFormConfig && isActionable ? (
-                      <form onSubmit={(event) => {
-                  void handleSubmit(event)
-                }} noValidate>
-                        <JsonForms
-                          schema={ogaFormConfig.schema}
-                          uischema={ogaFormConfig.uiSchema}
-                          data={ogaFormData}
-                          renderers={radixRenderers}
-                          onChange={({ data, errors }: { data: Record<string, unknown>; errors?: unknown[] }) => {
-                            setOgaFormData(data);
-                            setFormErrors(errors || []);
-                          }}
-                        />
-                        <Flex justify="end" gap="3" mt="6">
-                          <Button
-                            variant="soft"
-                            color="gray"
-                            onClick={() => { void navigate('/workflows') }}
-                            disabled={isSubmitting || isSendingFeedback}
-                            type="button"
-                          >
-                            Cancel
-                          </Button>
-                          {application.status !== 'FEEDBACK_REQUESTED' && (
-                            <Button
-                              variant="soft"
-                              color="amber"
-                              type="button"
-                              disabled={isSubmitting || isSendingFeedback}
-                              onClick={() => {
-                                setShowFeedbackInput(true)
-                                setActiveTab('comments')
-                              }}
-                            >
-                              Request Changes
-                            </Button>
-                          )}
-                          <Button type="submit" disabled={isSubmitting || isSendingFeedback}>
-                            {isSubmitting ? <Spinner size="1" /> : null}
-                            Submit Review
-                          </Button>
-                        </Flex>
-                      </form>
-                    ) : ogaFormConfig ? (
+                    <form
+                      onSubmit={(event) => {
+                        void handleSubmit(event)
+                      }}
+                      noValidate
+                    >
                       <JsonForms
                         schema={ogaFormConfig.schema}
                         uischema={ogaFormConfig.uiSchema}
                         data={ogaFormData}
                         renderers={radixRenderers}
-                        readonly
                         onChange={({ data, errors }: { data: Record<string, unknown>; errors?: unknown[] }) => {
-                          setOgaFormData(data);
-                          setFormErrors(errors || []);
+                          setOgaFormData(data)
+                          setFormErrors(errors || [])
                         }}
                       />
+                      <Flex justify="end" gap="3" mt="6">
+                        <Button
+                          variant="soft"
+                          color="gray"
+                          onClick={() => {
+                            void navigate('/workflows')
+                          }}
+                          disabled={isSubmitting || isSendingFeedback}
+                          type="button"
+                        >
+                          Cancel
+                        </Button>
+                        {application.status !== 'FEEDBACK_REQUESTED' && (
+                          <Button
+                            variant="soft"
+                            color="amber"
+                            type="button"
+                            disabled={isSubmitting || isSendingFeedback}
+                            onClick={() => {
+                              setShowFeedbackInput(true)
+                              setActiveTab('comments')
+                            }}
+                          >
+                            Request Changes
+                          </Button>
+                        )}
+                        <Button type="submit" disabled={isSubmitting || isSendingFeedback}>
+                          {isSubmitting ? <Spinner size="1" /> : null}
+                          Submit Review
+                        </Button>
+                      </Flex>
+                    </form>
+                  ) : ogaFormConfig ? (
+                    <JsonForms
+                      schema={ogaFormConfig.schema}
+                      uischema={ogaFormConfig.uiSchema}
+                      data={ogaFormData}
+                      renderers={radixRenderers}
+                      readonly
+                      onChange={({ data, errors }: { data: Record<string, unknown>; errors?: unknown[] }) => {
+                        setOgaFormData(data)
+                        setFormErrors(errors || [])
+                      }}
+                    />
                   ) : null}
                 </Tabs.Content>
 
@@ -375,8 +452,12 @@ export function WorkflowDetailScreen() {
                           {application.feedbackHistory!.map((entry) => (
                             <div key={entry.round} className="bg-white px-4 py-3">
                               <Flex justify="between" mb="1">
-                                <Text size="1" weight="bold" color="amber">Round {entry.round}</Text>
-                                <Text size="1" color="gray">{new Date(entry.timestamp).toLocaleString()}</Text>
+                                <Text size="1" weight="bold" color="amber">
+                                  Round {entry.round}
+                                </Text>
+                                <Text size="1" color="gray">
+                                  {new Date(entry.timestamp).toLocaleString()}
+                                </Text>
                               </Flex>
                               <Text size="2" className="whitespace-pre-wrap">
                                 {entry.content.feedback as string}
@@ -409,7 +490,10 @@ export function WorkflowDetailScreen() {
                             color="gray"
                             size="2"
                             type="button"
-                            onClick={() => { setShowFeedbackInput(false); setFeedbackText('') }}
+                            onClick={() => {
+                              setShowFeedbackInput(false)
+                              setFeedbackText('')
+                            }}
                           >
                             Cancel
                           </Button>
@@ -418,7 +502,9 @@ export function WorkflowDetailScreen() {
                             size="2"
                             type="button"
                             disabled={isSendingFeedback || !feedbackText.trim()}
-                            onClick={() => { void handleSendFeedback() }}
+                            onClick={() => {
+                              void handleSendFeedback()
+                            }}
                           >
                             {isSendingFeedback ? <Spinner size="1" /> : null}
                             Send Feedback
@@ -429,12 +515,7 @@ export function WorkflowDetailScreen() {
 
                     {application.status === 'PENDING' && !showFeedbackInput && (
                       <Flex justify="end">
-                        <Button
-                          variant="soft"
-                          color="amber"
-                          type="button"
-                          onClick={() => setShowFeedbackInput(true)}
-                        >
+                        <Button variant="soft" color="amber" type="button" onClick={() => setShowFeedbackInput(true)}>
                           Request Changes
                         </Button>
                       </Flex>
@@ -442,7 +523,9 @@ export function WorkflowDetailScreen() {
 
                     {application.status === 'FEEDBACK_REQUESTED' && (
                       <Callout.Root color="amber" variant="surface">
-                        <Callout.Icon><ChatBubbleIcon /></Callout.Icon>
+                        <Callout.Icon>
+                          <ChatBubbleIcon />
+                        </Callout.Icon>
                         <Callout.Text>
                           Feedback has been sent. Awaiting trader resubmission before further changes can be requested.
                         </Callout.Text>

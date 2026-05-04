@@ -5,15 +5,9 @@
     "baseUrl": ".",
     "target": "ES2022",
     "useDefineForClassFields": true,
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
-    ],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
-    "types": [
-      "vite/client"
-    ],
+    "types": ["vite/client"],
     "skipLibCheck": true,
     /* Bundler mode */
     "moduleResolution": "bundler",
@@ -30,15 +24,9 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
     "paths": {
-      "@opennsw/ui": [
-        "../../packages/ui/src/index.ts"
-      ],
-      "@opennsw/jsonforms-renderers": [
-        "../../packages/jsonforms-renderers/src/index.ts"
-      ]
+      "@opennsw/ui": ["../../packages/ui/src/index.ts"],
+      "@opennsw/jsonforms-renderers": ["../../packages/jsonforms-renderers/src/index.ts"]
     }
   },
-  "include": [
-    "src"
-  ]
+  "include": ["src"]
 }

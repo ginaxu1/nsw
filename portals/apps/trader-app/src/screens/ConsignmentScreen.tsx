@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, type ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Badge, Box, Button, Dialog, Flex, IconButton, Select, Spinner, Text, TextField } from '@radix-ui/themes'
 import { MagnifyingGlassIcon, PlusIcon } from '@radix-ui/react-icons'
-import type { ConsignmentSummary, TradeFlow, ConsignmentState, CHA } from "../services/types/consignment.ts"
-import { createConsignment, getAllConsignments, getCHAs } from "../services/consignment.ts"
+import type { ConsignmentSummary, TradeFlow, ConsignmentState, CHA } from '../services/types/consignment.ts'
+import { createConsignment, getAllConsignments, getCHAs } from '../services/consignment.ts'
 import { useApi } from '../services/ApiContext'
 import { useRole } from '../services/RoleContext'
 import { getStateColor, formatState, formatDate } from '../utils/consignmentUtils'
@@ -67,7 +67,7 @@ export function ConsignmentScreen() {
           stateFilter as ConsignmentState | 'all',
           tradeFlowFilter as TradeFlow | 'all',
           role,
-          api
+          api,
         )
         if (requestId !== listRequestIdRef.current) {
           return
@@ -109,7 +109,7 @@ export function ConsignmentScreen() {
           flow: newFlow,
           chaId: newChaId,
         },
-        api
+        api,
       )
       handleNewOpenChange(false)
       // ensure list refreshes (user will see it in both views)
@@ -133,8 +133,6 @@ export function ConsignmentScreen() {
 
     return matchesSearch
   })
-
-
 
   if (loading) {
     return (
@@ -389,11 +387,7 @@ export function ConsignmentScreen() {
                         </Text>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <Badge
-                          size="1"
-                          color={consignment.flow === 'IMPORT' ? 'blue' : 'green'}
-                          variant="soft"
-                        >
+                        <Badge size="1" color={consignment.flow === 'IMPORT' ? 'blue' : 'green'} variant="soft">
                           {consignment.flow}
                         </Badge>
                       </td>
@@ -426,9 +420,8 @@ export function ConsignmentScreen() {
           hasNext={(page + 1) * limit < totalCount}
           hasPrev={page > 0}
           totalCount={totalCount}
-
         />
       </div>
-    </div >
+    </div>
   )
 }

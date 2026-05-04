@@ -12,10 +12,7 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     getAccessTokenRef.current = getAccessToken
   }, [getAccessToken])
 
-  const client = useMemo(
-    () => createApiClient(async () => getAccessTokenRef.current()),
-    []
-  )
+  const client = useMemo(() => createApiClient(async () => getAccessTokenRef.current()), [])
 
   return <ApiContext.Provider value={client}>{children}</ApiContext.Provider>
 }

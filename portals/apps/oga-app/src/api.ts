@@ -1,6 +1,6 @@
 // API service for OGA Portal
-import type { JsonSchema, UISchemaElement } from '@jsonforms/core';
-import { API_BASE_URL } from './constants';
+import type { JsonSchema, UISchemaElement } from '@jsonforms/core'
+import { API_BASE_URL } from './constants'
 
 export type AccessTokenProvider = () => Promise<string | null | undefined>
 
@@ -81,7 +81,7 @@ export function createApiClient(getAccessToken?: AccessTokenProvider): ApiClient
       })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: response.statusText })) as { error?: string }
+        const errorData = (await response.json().catch(() => ({ error: response.statusText }))) as { error?: string }
         throw new Error(errorData.error ?? `Failed request: ${response.statusText}`)
       }
 
@@ -95,58 +95,57 @@ export function createApiClient(getAccessToken?: AccessTokenProvider): ApiClient
 export const defaultApiClient = createApiClient()
 
 export interface ReviewResponse {
-  success: boolean;
-  message?: string;
-  error?: string;
+  success: boolean
+  message?: string
+  error?: string
 }
 
 export interface FeedbackEntry {
-  content: Record<string, unknown>;
-  timestamp: string;
-  round: number;
+  content: Record<string, unknown>
+  timestamp: string
+  round: number
 }
 
 export interface OGAApplication {
-  taskId: string;
-  workflowId: string;
-  serviceUrl: string;
-  data: Record<string, unknown>;
-  ogaActionData?: Record<string, unknown>;
+  taskId: string
+  workflowId: string
+  serviceUrl: string
+  data: Record<string, unknown>
+  ogaActionData?: Record<string, unknown>
   dataForm?: {
-    schema: JsonSchema;
-    uiSchema: UISchemaElement;
-  };
+    schema: JsonSchema
+    uiSchema: UISchemaElement
+  }
   ogaForm?: {
-    schema: JsonSchema;
-    uiSchema: UISchemaElement;
-  };
-  status: string;
-  feedbackHistory?: FeedbackEntry[];
-  reviewerNotes?: string;
-  reviewedAt?: string;
-  createdAt: string;
-  updatedAt: string;
+    schema: JsonSchema
+    uiSchema: UISchemaElement
+  }
+  status: string
+  feedbackHistory?: FeedbackEntry[]
+  reviewerNotes?: string
+  reviewedAt?: string
+  createdAt: string
+  updatedAt: string
 }
 
-
 export interface WorkflowSummary {
-  workflowId: string;
-  updatedAt: string;
-  status: string;
-  taskCount: number;
+  workflowId: string
+  updatedAt: string
+  status: string
+  taskCount: number
 }
 
 export interface PaginatedResponse<T> {
-  items: T[];
-  total: number;
-  page: number;
-  pageSize: number;
+  items: T[]
+  total: number
+  page: number
+  pageSize: number
 }
 
 export async function fetchWorkflows(
   apiClient: ApiClient,
   params?: { q?: string; page?: number; pageSize?: number },
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<PaginatedResponse<WorkflowSummary>> {
   return apiClient.get<PaginatedResponse<WorkflowSummary>>(
     '/api/oga/workflows',
@@ -155,14 +154,14 @@ export async function fetchWorkflows(
       page: params?.page,
       pageSize: params?.pageSize,
     },
-    signal
+    signal,
   )
 }
 
 export async function fetchApplications(
   apiClient: ApiClient,
   params?: { status?: string; workflowId?: string; q?: string; page?: number; pageSize?: number },
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<PaginatedResponse<OGAApplication>> {
   return apiClient.get<PaginatedResponse<OGAApplication>>(
     '/api/oga/applications',
@@ -173,12 +172,16 @@ export async function fetchApplications(
       page: params?.page,
       pageSize: params?.pageSize,
     },
-    signal
+    signal,
   )
 }
 
 // Fetch application detail by taskId from OGA Service
-export async function fetchApplicationDetail(apiClient: ApiClient, taskId: string, signal?: AbortSignal): Promise<OGAApplication> {
+export async function fetchApplicationDetail(
+  apiClient: ApiClient,
+  taskId: string,
+  signal?: AbortSignal,
+): Promise<OGAApplication> {
   return apiClient.get<OGAApplication>(`/api/oga/applications/${taskId}`, {}, signal)
 }
 
@@ -187,12 +190,12 @@ export async function submitReview(
   apiClient: ApiClient,
   taskId: string,
   formValues: Record<string, unknown>,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<ReviewResponse> {
   return apiClient.post<Record<string, unknown>, ReviewResponse>(
     `/api/oga/applications/${taskId}/review`,
     formValues,
-    signal
+    signal,
   )
 }
 
@@ -201,11 +204,11 @@ export async function submitFeedback(
   apiClient: ApiClient,
   taskId: string,
   content: Record<string, unknown>,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<ReviewResponse> {
   return apiClient.post<Record<string, unknown>, ReviewResponse>(
-      `/api/oga/applications/${taskId}/feedback`,
-      content,
-      signal
+    `/api/oga/applications/${taskId}/feedback`,
+    content,
+    signal,
   )
 }

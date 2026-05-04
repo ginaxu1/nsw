@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { Text, Box, Flex, Badge, Spinner, TextField, ScrollArea, IconButton } from '@radix-ui/themes'
 import { MagnifyingGlassIcon, Cross2Icon } from '@radix-ui/react-icons'
-import { getHSCodes } from "../../services/hsCode.ts";
+import { getHSCodes } from '../../services/hsCode.ts'
 import { useApi } from '../../services/ApiContext'
-import type { HSCode } from "../../services/types/hsCode.ts";
+import type { HSCode } from '../../services/types/hsCode.ts'
 
 interface HSCodeSearchProps {
   value: HSCode | null
@@ -38,10 +38,13 @@ export function HSCodeSearch({ value, onChange }: HSCodeSearchProps) {
       const requestId = ++searchRequestIdRef.current
       setLoading(true)
       try {
-        const result = await getHSCodes({
-          hsCodeStartsWith: searchQuery,
-          limit: 20,
-        }, api)
+        const result = await getHSCodes(
+          {
+            hsCodeStartsWith: searchQuery,
+            limit: 20,
+          },
+          api,
+        )
         if (requestId !== searchRequestIdRef.current) {
           return
         }
@@ -135,29 +138,20 @@ export function HSCodeSearch({ value, onChange }: HSCodeSearchProps) {
                       py="2"
                       gap="3"
                       align="start"
-                      className={`cursor-pointer transition-colors ${isSelected
-                        ? 'bg-blue-50 hover:bg-blue-100'
-                        : 'hover:bg-gray-50'
-                        }`}
+                      className={`cursor-pointer transition-colors ${
+                        isSelected ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-gray-50'
+                      }`}
                       onClick={() => handleSelect(hsCode)}
                     >
                       <Box pt="1">
-                        <MagnifyingGlassIcon
-                          height="14"
-                          width="14"
-                          className="text-gray-400"
-                        />
+                        <MagnifyingGlassIcon height="14" width="14" className="text-gray-400" />
                       </Box>
                       <Box style={{ flex: 1, minWidth: 0 }}>
                         <Flex align="center" gap="2" mb="1">
                           <Text size="2" weight="medium">
                             {hsCode.hsCode}
                           </Text>
-                          <Badge
-                            size="1"
-                            color={getCategoryColor(hsCode.category)}
-                            variant="soft"
-                          >
+                          <Badge size="1" color={getCategoryColor(hsCode.category)} variant="soft">
                             {hsCode.category}
                           </Badge>
                         </Flex>

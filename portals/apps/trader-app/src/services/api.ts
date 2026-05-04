@@ -10,7 +10,6 @@ export interface ApiClient {
   getAuthHeaders(includeJsonContentType?: boolean): Promise<HeadersInit>
 }
 
-
 export type ErrorResponse = {
   code: string
   message: string
@@ -71,11 +70,7 @@ async function buildHeaders(token?: string | null, includeJsonContentType = true
   return headers
 }
 
-export async function apiGet<T>(
-  endpoint: string,
-  params: QueryParams = {},
-  token?: string | null
-): Promise<T> {
+export async function apiGet<T>(endpoint: string, params: QueryParams = {}, token?: string | null): Promise<T> {
   const queryString = buildQueryString(params)
   const url = `${API_BASE_URL}${endpoint}${queryString ? `?${queryString}` : ''}`
 
@@ -88,11 +83,7 @@ export async function apiGet<T>(
   return (await response.json()) as T
 }
 
-export async function apiPost<T, R>(
-  endpoint: string,
-  body: T,
-  token?: string | null
-): Promise<R> {
+export async function apiPost<T, R>(endpoint: string, body: T, token?: string | null): Promise<R> {
   const url = `${API_BASE_URL}${endpoint}`
 
   const response = await fetch(url, {
@@ -120,11 +111,7 @@ export async function apiPost<T, R>(
   }
 }
 
-export async function apiPut<T, R>(
-  endpoint: string,
-  body: T,
-  token?: string | null
-): Promise<R> {
+export async function apiPut<T, R>(endpoint: string, body: T, token?: string | null): Promise<R> {
   const url = `${API_BASE_URL}${endpoint}`
 
   const response = await fetch(url, {
@@ -157,7 +144,7 @@ export function createApiClient(getAccessToken?: AccessTokenProvider): ApiClient
 
   return {
     async get<T>(endpoint: string, params: QueryParams = {}): Promise<T> {
-      const token = getAccessToken ? (await getAccessToken()) ?? null : null
+      const token = getAccessToken ? ((await getAccessToken()) ?? null) : null
       const requestKey = buildRequestKey(endpoint, params, token)
 
       const existingRequest = inFlightGetRequests.get(requestKey)
@@ -186,7 +173,7 @@ export function createApiClient(getAccessToken?: AccessTokenProvider): ApiClient
       return apiPut<T, R>(endpoint, body, token)
     },
     async getAuthHeaders(includeJsonContentType = true): Promise<HeadersInit> {
-      const token = getAccessToken ? (await getAccessToken()) ?? null : null
+      const token = getAccessToken ? ((await getAccessToken()) ?? null) : null
       return buildHeaders(token, includeJsonContentType)
     },
   }

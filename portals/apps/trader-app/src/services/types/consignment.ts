@@ -7,22 +7,11 @@ export interface CHA {
 
 export type TradeFlow = 'IMPORT' | 'EXPORT'
 
-export type ConsignmentState =
-  | 'INITIALIZED'
-  | 'IN_PROGRESS'
-  | 'FAILED'
-  | 'FINISHED'
+export type ConsignmentState = 'INITIALIZED' | 'IN_PROGRESS' | 'FAILED' | 'FINISHED'
 
 export type WorkflowNodeState = 'READY' | 'LOCKED' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED'
 
-export type StepType =
-  | 'SIMPLE_FORM'
-  | 'WAIT_FOR_EVENT'
-  | 'PAYMENT'
-  | 'START'
-  | 'END'
-  | 'GATEWAY'
-  | 'END_NODE'
+export type StepType = 'SIMPLE_FORM' | 'WAIT_FOR_EVENT' | 'PAYMENT' | 'START' | 'END' | 'GATEWAY' | 'END_NODE'
 
 export interface GlobalContext {
   consigneeAddress: string
@@ -59,7 +48,6 @@ export interface WorkflowNode {
 export interface ConsignmentItem {
   hsCode: HSCodeDetails
 }
-
 
 export interface ConsignmentSummary {
   id: string

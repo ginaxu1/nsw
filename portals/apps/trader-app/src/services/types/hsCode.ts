@@ -5,8 +5,6 @@ export interface HSCode {
   category: string
 }
 
-
-
 export interface HSCodeQueryParams {
   hsCodeStartsWith?: string
   limit?: number

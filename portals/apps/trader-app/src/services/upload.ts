@@ -28,14 +28,11 @@ export interface UploadResponse {
 }
 
 export async function uploadFile(apiClient: ApiClient, file: File): Promise<UploadResponse> {
-  const metadata = await apiClient.post<UploadMetadataRequest, UploadMetadataResponse>(
-    '/uploads',
-    {
-      filename: file.name,
-      mime_type: file.type || 'application/octet-stream',
-      size: file.size,
-    }
-  )
+  const metadata = await apiClient.post<UploadMetadataRequest, UploadMetadataResponse>('/uploads', {
+    filename: file.name,
+    mime_type: file.type || 'application/octet-stream',
+    size: file.size,
+  })
 
   // Upload file bytes directly to the storage destination (presigned URL)
   const uploadResponse = await fetch(metadata.upload_url, {

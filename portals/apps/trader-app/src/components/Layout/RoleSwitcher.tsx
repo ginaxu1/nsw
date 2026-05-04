@@ -3,12 +3,15 @@ import { Select, Flex, Text, Box } from '@radix-ui/themes'
 import { type ReactNode } from 'react'
 import { useRole, type Role } from '../../services/RoleContext'
 
-const ROLE_CONFIG: Record<Role, {
-  label: string;
-  description: string;
-  dropdownDescription: string;
-  icon: ReactNode
-}> = {
+const ROLE_CONFIG: Record<
+  Role,
+  {
+    label: string
+    description: string
+    dropdownDescription: string
+    icon: ReactNode
+  }
+> = {
   trader: {
     label: 'Trader',
     description: 'Managing consignments',
@@ -28,9 +31,7 @@ function RoleDisplay({ role, showPrimaryLabel }: { role: Role; showPrimaryLabel:
 
   return (
     <Flex align="center" gap="3" className="w-60 text-left">
-      <Box className="rounded-md border border-gray-100 bg-white p-1.5 shadow-sm">
-        {icon}
-      </Box>
+      <Box className="rounded-md border border-gray-100 bg-white p-1.5 shadow-sm">{icon}</Box>
       <Box className="flex-1">
         <Flex align="center" gap="1">
           <Text size="1" weight="bold" className="block leading-none">
@@ -59,11 +60,7 @@ export function RoleSwitcher() {
     <Box className="flex-1 max-w-md px-8">
       {!isLoading ? (
         <Box className="h-full w-full">
-          <Select.Root
-            value={role}
-            onValueChange={(val) => setRole(val as Role)}
-            disabled={!showSwitcher}
-          >
+          <Select.Root value={role} onValueChange={(val) => setRole(val as Role)} disabled={!showSwitcher}>
             <Select.Trigger
               variant="ghost"
               className={`h-12 w-full p-4 transition-all ${showSwitcher ? 'cursor-pointer hover:bg-gray-100' : 'cursor-default'}`}

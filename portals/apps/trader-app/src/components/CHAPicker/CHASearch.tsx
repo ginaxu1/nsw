@@ -124,4 +124,3 @@ export function CHASearch({ value, onChange, options }: CHASearchProps) {
     </Box>
   )
 }
-

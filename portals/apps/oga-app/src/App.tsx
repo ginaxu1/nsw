@@ -4,8 +4,8 @@ import { Layout } from './components/Layout'
 import { WorkflowListScreen } from './screens/WorkflowListScreen'
 import { WorkflowTasksScreen } from './screens/WorkflowTasksScreen'
 import { WorkflowDetailScreen } from './screens/WorkflowDetailScreen'
-import {appConfig} from "./config.ts";
-import {useEffect} from "react";
+import { appConfig } from './config.ts'
+import { useEffect } from 'react'
 import { SignedOut, useAsgardeo } from '@asgardeo/react'
 import { LoginScreen } from './screens/LoginScreen'
 import { ApiProvider } from './services/ApiProvider'
@@ -16,10 +16,7 @@ import { uploadFile, getDownloadUrl } from './services/upload'
 function UploadWrapper({ children }: { children: ReactNode }) {
   const api = useApi()
   return (
-    <UploadProvider
-      onUpload={(file) => uploadFile(api, file)}
-      getDownloadUrl={(key) => getDownloadUrl(api, key)}
-    >
+    <UploadProvider onUpload={(file) => uploadFile(api, file)} getDownloadUrl={(key) => getDownloadUrl(api, key)}>
       {children}
     </UploadProvider>
   )
@@ -40,15 +37,21 @@ function ProtectedLayout() {
 }
 
 function App() {
-
   useEffect(() => {
     // Set document title
-    document.title = appConfig.branding.appName;
-  }, []);
+    document.title = appConfig.branding.appName
+  }, [])
 
   return (
     <Routes>
-      <Route path="/login" element={<SignedOut><LoginScreen /></SignedOut>} />
+      <Route
+        path="/login"
+        element={
+          <SignedOut>
+            <LoginScreen />
+          </SignedOut>
+        }
+      />
 
       <Route element={<ProtectedLayout />}>
         <Route path="/" element={<Navigate to="/workflows" replace />} />

@@ -1,22 +1,13 @@
 import React, { useState } from 'react'
-import {
-  Badge,
-  Flex,
-  Box,
-  Heading,
-  IconButton,
-} from '@radix-ui/themes'
-import {
-  ChevronDownIcon,
-  ChevronUpIcon,
-} from '@radix-ui/react-icons'
+import { Badge, Flex, Box, Heading, IconButton } from '@radix-ui/themes'
+import { ChevronDownIcon, ChevronUpIcon } from '@radix-ui/react-icons'
 
 export interface CollapsibleSectionProps {
   title: string
   count: number
   children: React.ReactNode
   defaultOpen?: boolean
-  color?: "gray" | "blue" | "green"
+  color?: 'gray' | 'blue' | 'green'
 }
 
 export const CollapsibleSection = ({
@@ -24,7 +15,7 @@ export const CollapsibleSection = ({
   count,
   children,
   defaultOpen = false,
-  color = "gray" as const,
+  color = 'gray' as const,
 }: CollapsibleSectionProps) => {
   const [isOpen, setIsOpen] = useState(defaultOpen)
 

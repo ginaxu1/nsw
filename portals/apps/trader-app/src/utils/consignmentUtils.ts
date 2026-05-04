@@ -3,9 +3,7 @@ import type { ConsignmentState } from '../services/types/consignment'
 /**
  * Get the appropriate color for a consignment state badge
  */
-export function getStateColor(
-  state: ConsignmentState
-): 'gray' | 'orange' | 'green' | 'red' {
+export function getStateColor(state: ConsignmentState): 'gray' | 'orange' | 'green' | 'red' {
   switch (state) {
     case 'INITIALIZED':
     case 'IN_PROGRESS':

@@ -1,12 +1,5 @@
 import { useCallback, useMemo, useState, useEffect } from 'react'
-import {
-  ReactFlow,
-  Background,
-  Controls,
-  useNodesState,
-  useEdgesState,
-  MarkerType,
-} from '@xyflow/react'
+import { ReactFlow, Background, Controls, useNodesState, useEdgesState, MarkerType } from '@xyflow/react'
 import type { Edge, NodeTypes } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { Button } from '@radix-ui/themes'
@@ -27,10 +20,7 @@ const nodeTypes: NodeTypes = {
   workflowStep: WorkflowNode,
 }
 
-function getNodePosition(
-  step: WorkflowNodeData,
-  allSteps: WorkflowNodeData[]
-): { x: number; y: number } {
+function getNodePosition(step: WorkflowNodeData, allSteps: WorkflowNodeData[]): { x: number; y: number } {
   // Calculate depth based on dependencies (topological layer)
   const depths = new Map<string, number>()
 
@@ -43,9 +33,7 @@ function getNodePosition(
       return 0
     }
 
-    const maxParentDepth = Math.max(
-      ...s.depends_on.map((depId) => calculateDepth(depId))
-    )
+    const maxParentDepth = Math.max(...s.depends_on.map((depId) => calculateDepth(depId)))
     const depth = maxParentDepth + 1
     depths.set(stepId, depth)
     return depth
@@ -57,16 +45,14 @@ function getNodePosition(
   const depth = depths.get(step.id) || 0
 
   // Group steps by depth to calculate horizontal position
-  const stepsAtSameDepth = allSteps.filter(
-    (s) => depths.get(s.id) === depth
-  )
+  const stepsAtSameDepth = allSteps.filter((s) => depths.get(s.id) === depth)
   const indexAtDepth = stepsAtSameDepth.findIndex((s) => s.id === step.id)
   const totalAtDepth = stepsAtSameDepth.length
 
   // Center nodes horizontally within their depth layer (vertical flow)
   const verticalSpacing = 200
   const horizontalSpacing = 300
-  const startX = -(totalAtDepth - 1) * horizontalSpacing / 2
+  const startX = (-(totalAtDepth - 1) * horizontalSpacing) / 2
 
   return {
     x: startX + indexAtDepth * horizontalSpacing,
@@ -90,7 +76,7 @@ function convertToReactFlow(steps: WorkflowNodeData[]): {
   const edges: Edge[] = []
   steps.forEach((step) => {
     step.depends_on.forEach((depId) => {
-      const sourceStep = steps.find(s => s.id === depId)
+      const sourceStep = steps.find((s) => s.id === depId)
       const isCompleted = sourceStep?.state === 'COMPLETED'
 
       edges.push({
@@ -118,10 +104,7 @@ function WorkflowViewerContent({ steps, className = '', onRefresh, refreshing = 
   const [isSpacePressed, setIsSpacePressed] = useState(false)
   const { fitView } = useReactFlow()
 
-  const { nodes: initialNodes, edges: initialEdges } = useMemo(
-    () => convertToReactFlow(steps),
-    [steps]
-  )
+  const { nodes: initialNodes, edges: initialEdges } = useMemo(() => convertToReactFlow(steps), [steps])
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
@@ -139,7 +122,7 @@ function WorkflowViewerContent({ steps, className = '', onRefresh, refreshing = 
           maxZoom: 1.0,
           minZoom: 0.5,
           duration: 800,
-          interpolate : "linear",
+          interpolate: 'linear',
         })
       } else {
         fitView({ padding: 0.5, maxZoom: 1.0, duration: 800 })
@@ -180,13 +163,7 @@ function WorkflowViewerContent({ steps, className = '', onRefresh, refreshing = 
     <div className={`w-full bg-slate-50 rounded-lg border border-gray-200 relative flex flex-col ${className}`}>
       {onRefresh && (
         <div className="absolute top-3 right-3 z-10">
-          <Button
-            variant="soft"
-            color="blue"
-            size="2"
-            onClick={onRefresh}
-            disabled={refreshing}
-          >
+          <Button variant="soft" color="blue" size="2" onClick={onRefresh} disabled={refreshing}>
             <ReloadIcon className={refreshing ? 'animate-spin' : ''} />
             Refresh
           </Button>

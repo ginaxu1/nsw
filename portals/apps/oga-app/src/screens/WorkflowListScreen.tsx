@@ -22,10 +22,10 @@ export function WorkflowListScreen() {
     async function fetchData(isSilent = false) {
       try {
         if (!isSilent) setLoading(true)
-        const result = await fetchWorkflows(apiClient, { 
-          page, 
+        const result = await fetchWorkflows(apiClient, {
+          page,
           pageSize: PAGE_SIZE,
-          q: searchQuery 
+          q: searchQuery,
         })
         setWorkflows(result.items || [])
         setTotal(result.total || 0)
@@ -52,7 +52,7 @@ export function WorkflowListScreen() {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
-      year: 'numeric'
+      year: 'numeric',
     })
   }
 
@@ -134,34 +134,35 @@ export function WorkflowListScreen() {
                   {workflows.map((wf) => (
                     <tr
                       key={wf.workflowId}
-                      onClick={() => { void navigate(`/workflows/${wf.workflowId}/tasks`) }}
+                      onClick={() => {
+                        void navigate(`/workflows/${wf.workflowId}/tasks`)
+                      }}
                       className="hover:bg-blue-50/30 cursor-pointer transition-colors group text-sm"
                     >
                       <td className="px-6 py-4 break-all font-mono text-blue-600 font-medium hover:underline">
                         {wf.workflowId}
                       </td>
 
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                          {wf.taskCount}
-                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">{wf.taskCount}</td>
 
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Badge
                           size="1"
                           color={
-                            wf.status === 'APPROVED' ? 'green' :
-                              wf.status === 'REJECTED' ? 'red' :
-                                wf.status === 'FEEDBACK_REQUESTED' ? 'amber' :
-                                  'blue'
+                            wf.status === 'APPROVED'
+                              ? 'green'
+                              : wf.status === 'REJECTED'
+                                ? 'red'
+                                : wf.status === 'FEEDBACK_REQUESTED'
+                                  ? 'amber'
+                                  : 'blue'
                           }
                           variant="surface"
                         >
                           {wf.status}
                         </Badge>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-gray-600">
-                        {formatDateForTable(wf.updatedAt)}
-                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-600">{formatDateForTable(wf.updatedAt)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -177,20 +178,10 @@ export function WorkflowListScreen() {
               Page {page} of {totalPages} ({total} results)
             </Text>
             <div className="flex items-center gap-2">
-              <IconButton
-                size="1"
-                variant="soft"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
+              <IconButton size="1" variant="soft" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
                 <ChevronLeftIcon />
               </IconButton>
-              <IconButton
-                size="1"
-                variant="soft"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
+              <IconButton size="1" variant="soft" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
                 <ChevronRightIcon />
               </IconButton>
             </div>

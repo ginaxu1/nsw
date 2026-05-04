@@ -17,8 +17,7 @@ export const ROUTES = {
   HOME: '/',
   CONSIGNMENTS: '/consignments',
   CONSIGNMENT_DETAIL: (id: string) => `/consignments/${id}`,
-  TASK_FORM: (consignmentId: string, taskId: string) =>
-    `/consignments/${consignmentId}/tasks/${taskId}`,
+  TASK_FORM: (consignmentId: string, taskId: string) => `/consignments/${consignmentId}/tasks/${taskId}`,
 } as const
 
 // Pagination
