@@ -1,8 +1,8 @@
 # deployments/helm/trader-app/values.yaml (Base Schema)
 
 global:
-  clusterDomain: "apps.sovecloud1.akaza.lk"
-  namespace: "national-single-window-platform"
+  clusterDomain: ""
+  namespace: ""
 
 fullnameOverride: ""
 replicaCount: 1
@@ -17,12 +17,12 @@ securityContext:
       - ALL
 
 image:
-  repository: ghcr.io/opennsw/trader-app
+  repository: ghcr.io/opennsw/nsw-trader-portal
   pullPolicy: IfNotPresent
   tag: latest
 
-imagePullSecrets: []
-#  - name: ghcr-secret
+imagePullSecrets: 
+  - name: ghcr-secret
 
 service:
   type: ClusterIP
@@ -31,10 +31,10 @@ service:
 
 # Generic defaults. Overridden by environment files.
 config:
-  apiBaseUrl: "https://nsw-api-national-single-window-platform.lgc.gov.lk/api/v1"
-  idpBaseUrl: "https://idp-route.national-single-window-platform.lgc.gov.lk"
+  apiBaseUrl: ""
+  idpBaseUrl: ""
   idpClientId: "TRADER_PORTAL_APP"
-  appUrl: "https://trader-portal-national-single-window-platform.lgc.gov.lk"
+  appUrl: ""
   idpScopes: "openid,profile,email,group,role"
   idpPlatform: "AsgardeoV2"
   idpTraderGroupName: "Traders"
