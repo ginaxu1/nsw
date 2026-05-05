@@ -16,7 +16,9 @@ COPY . .
 
 RUN pnpm --filter trader-app build
 
-FROM nginx:1.27-alpine
+FROM nginx:1.30-alpine
+
+RUN apk --no-cache upgrade
 
 LABEL org.opencontainers.image.source="https://github.com/OpenNSW/nsw"
 LABEL org.opencontainers.image.description="NSW Trader Portal Frontend"
