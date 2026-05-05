@@ -125,26 +125,27 @@ jobs:
         run: |
           cd gitops-repo
           VERSION="${{ steps.version.outputs.version }}"
-          echo "Updating all DEV and STAGING manifests to version: $VERSION"
+          echo "Updating STAGING manifests to version: $VERSION"
 
-          # Dynamically find all values.yaml files in dev/staging environments
-          # Pattern: any values.yaml file inside a 'dev' or 'staging' directory under 'apps/'
-          readarray -t MANIFESTS < <(find apps -type f -name "values.yaml" | grep -E "/(dev|staging)/")
-
-          if [ ${#MANIFESTS[@]} -eq 0 ]; then
-            echo "❌ No manifest files found to update!"
-            exit 1
-          fi
+          # Explicitly target ONLY the new staging environments
+          MANIFESTS=(
+            "envs/nsw-staging/values.yaml"
+            "envs/nsw-infra-staging/values.yaml"
+          )
 
           for FILE in "${MANIFESTS[@]}"; do
-            yq eval ".image.tag = \"$VERSION\"" -i "$FILE"
-
-            # Special case: nsw-api manifests also carry a separate migration image tag.
-            if [[ "$FILE" == *"nsw-api"* ]]; then
-              yq eval ".dbMigrations.image.tag = \"$VERSION\"" -i "$FILE"
+            if [ -f "$FILE" ]; then
+              # Update the main app image tags
+              yq eval ".image.tag = \"$VERSION\"" -i "$FILE"
+              
+              # Special case: nsw-api manifests also carry a separate migration image tag
+              # The // "" ensures it doesn't break if dbMigrations isn't in the infra file
+              yq eval "(.dbMigrations.image.tag // \"\") = \"$VERSION\"" -i "$FILE"
+              
+              echo "✅ Updated $FILE"
+            else
+              echo "⚠️ Warning: $FILE not found, skipping."
             fi
-
-            echo "✅ Updated $FILE"
           done
 
       - name: Create Pull Request in GitOps Repo
@@ -167,12 +168,12 @@ jobs:
             fi
 
             git checkout -b "$BRANCH_NAME"
-            git commit -m "chore(cd): update dev/staging tags to v${VERSION}"
+            git commit -m "chore(cd): update staging tags to v${VERSION}"
             git push origin "$BRANCH_NAME"
             
             echo "Creating Pull Request..."
             gh pr create \
-              --title "🚀 Deploy v${VERSION} to Dev/Staging" \
+              --title "🚀 Deploy v${VERSION} to Staging" \
               --body "This PR updates the Helm manifests for all microservices to version \`v${VERSION}\`. 
               
               **Deployment Summary:**
@@ -198,5 +199,4 @@ jobs:
           echo "- **Trigger**: ${{ github.event_name }}" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "### Environments Updated" >> "$GITHUB_STEP_SUMMARY"
-          echo "- dev" >> "$GITHUB_STEP_SUMMARY"
           echo "- staging" >> "$GITHUB_STEP_SUMMARY"
