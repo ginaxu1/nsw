@@ -2,7 +2,7 @@ name: Build and Push Development Images
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, add-dev-cd-workflow ]
   workflow_dispatch:
 
 permissions:
@@ -64,7 +64,6 @@ jobs:
           # Renovate requires sequential run numbers to accurately sort and detect newest dev builds
           tags: |
             ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image_name }}:dev-${{ github.run_number }}-${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image_name }}:dev-latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
