@@ -17,7 +17,7 @@ securityContext:
       - ALL
 
 image:
-  repository: ghcr.io/opennsw/nsw-trader-portal
+  repository: ghcr.io/opennsw/trader-app
   pullPolicy: IfNotPresent
   tag: latest
 
