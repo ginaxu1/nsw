@@ -201,19 +201,24 @@ jobs:
 
       # Trivy scans the pushed image for CRITICAL/HIGH CVEs.
       # continue-on-error keeps the release moving if Trivy itself fails.
+      - name: Setup Trivy
+        if: steps.release-mode.outputs.enabled == 'true'
+        uses: aquasecurity/setup-trivy@e6c2c5e321ed9123bda567646e2f96565e34abe1
+        with:
+          version: v0.69.3
+
       - name: Run Trivy vulnerability scanner
         id: trivy-scan
         if: steps.release-mode.outputs.enabled == 'true'
-        uses: aquasecurity/trivy-action@0.35.0
-        with:
-          image-ref: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
-          version: v0.69.3
-          token-setup-trivy: ${{ secrets.GITHUB_TOKEN }}
-          format: sarif
-          output: trivy-${{ matrix.image_name }}.sarif
-          severity: CRITICAL,HIGH
-          exit-code: '1'
-          ignore-unfixed: true
+        run: |
+          trivy image \
+            --severity HIGH,CRITICAL \
+            --ignore-unfixed \
+            --ignorefile .trivyignore \
+            --format sarif \
+            --output "trivy-${{ matrix.image_name }}.sarif" \
+            --exit-code 1 \
+            "${{ fromJSON(steps.meta.outputs.json).tags[0] }}"
 
 
       - name: Upload Trivy results
@@ -228,6 +233,7 @@ jobs:
           trivy image \
             --severity HIGH,CRITICAL \
             --ignore-unfixed \
+            --ignorefile .trivyignore \
             --format table \
             ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
 

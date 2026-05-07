@@ -129,7 +129,7 @@ jobs:
 
           # Dynamically find all values.yaml files in dev/staging environments
           # Pattern: any values.yaml file inside a 'dev' or 'staging' directory under 'apps/'
-          readarray -t MANIFESTS < <(find apps -type f -name "values.yaml" | grep -E "/(dev|staging)/")
+          readarray -t MANIFESTS < <(find apps -type f -name "values.yaml" | grep -E "/(dev|staging)/" | grep -v -E "nsw-dev|nsw-infra-dev")
 
           if [ ${#MANIFESTS[@]} -eq 0 ]; then
             echo "❌ No manifest files found to update!"
