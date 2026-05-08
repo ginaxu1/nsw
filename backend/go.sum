@@ -1,5 +1,7 @@
 github.com/DATA-DOG/go-sqlmock v1.5.2 h1:OcvFkGmslmlZibjAjaHm3L//6LiuBgolP7OputlJIzU=
 github.com/DATA-DOG/go-sqlmock v1.5.2/go.mod h1:88MAG/4G7SMwSE3CeA0ZKzrT5CiOU3OJ+JlNzwDqpNU=
+github.com/LSFLK/argus/pkg/audit v0.0.0-20260507005814-d59aefb70fba h1:Zu8Ot0bMeWqPiXWLKDH4QJs3+bXBkRbOBtkEcIAA4JY=
+github.com/LSFLK/argus/pkg/audit v0.0.0-20260507005814-d59aefb70fba/go.mod h1:VPLkj7lPFOPSTNZulUsf+OCWcjz9vdndCRhcc2hfQjM=
 github.com/OpenNSW/go-temporal-workflow v0.3.2 h1:a5+PYt09618/MnC+5FjP9luqNJOCUZ71QZCWV4jdI7Q=
 github.com/OpenNSW/go-temporal-workflow v0.3.2/go.mod h1:YryMiRQ9MBkQUpAz8CwYnW56uFEYqb/cmmOd/YaYmao=
 github.com/aws/aws-sdk-go-v2 v1.41.7 h1:DWpAJt66FmnnaRIOT/8ASTucrvuDPZASqhhLey6tLY8=

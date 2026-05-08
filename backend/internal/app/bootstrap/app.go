@@ -6,7 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"time"
 
+	"github.com/LSFLK/argus/pkg/audit"
 	"github.com/OpenNSW/nsw/internal/auth"
 	"github.com/OpenNSW/nsw/internal/config"
 	"github.com/OpenNSW/nsw/internal/database"
@@ -159,7 +162,14 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 	// smsChannel := channels.NewSMSChannel(...)
 	// notificationManager.RegisterSMSChannel(smsChannel)
 
-	tmHandler := taskmanager.NewHTTPHandler(tm)
+	// Initialize audit client for Argus from ARGUS_SERVICE_URL environment variable.
+	auditURL := os.Getenv("ARGUS_SERVICE_URL")
+	auditClient := audit.NewClient(audit.Config{
+		BaseURL:   auditURL,
+		AuthToken: os.Getenv("ARGUS_AUTH_TOKEN"),
+	})
+
+	tmHandler := taskmanager.NewHTTPHandler(tm, auditClient)
 
 	// withAuth wraps an individual handler with the authentication middleware.
 	withAuth := authManager.Middleware()
@@ -234,6 +244,14 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 	closeFn := func() error {
 		var closeErrs []error
 
+		// Create a separate timeout context for shutting down the audit client
+		// to ensure pending logs are cleanly flushed regardless of parent context cancellation.
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := auditClient.Close(shutdownCtx); err != nil {
+			closeErrs = append(closeErrs, fmt.Errorf("failed to close audit client: %w", err))
+		}
 		if err := workflowRuntime.Close(); err != nil {
 			closeErrs = append(closeErrs, fmt.Errorf("failed to close workflow runtime: %w", err))
 		}
