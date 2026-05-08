@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/LSFLK/argus/pkg/audit"
 	"github.com/OpenNSW/nsw/internal/auth"
 	"github.com/OpenNSW/nsw/internal/database"
 	"github.com/OpenNSW/nsw/internal/temporal"
@@ -24,6 +25,7 @@ type Config struct {
 	Auth         auth.Config
 	Notification NotificationConfig
 	Temporal     temporal.Config
+	Audit        audit.Config
 }
 
 // ServerConfig holds server configuration
@@ -125,6 +127,10 @@ func Load() (*Config, error) {
 			PortRaw:   getEnvOrDefault("TEMPORAL_PORT", "7233"),
 			Namespace: getEnvOrDefault("TEMPORAL_NAMESPACE", "default"),
 		},
+		Audit: audit.Config{
+			BaseURL:   getEnvOrDefault("ARGUS_SERVICE_URL", ""),
+			AuthToken: os.Getenv("ARGUS_AUTH_TOKEN"),
+		},
 	}
 
 	// Validate required fields
@@ -169,6 +175,13 @@ func (c *Config) Validate() error {
 			return err
 		}
 	}
+
+	if strings.TrimSpace(c.Audit.BaseURL) != "" {
+		if err := validation.HTTPURL("ARGUS_SERVICE_URL", c.Audit.BaseURL); err != nil {
+			return fmt.Errorf("invalid audit configuration: %w", err)
+		}
+	}
+
 	return nil
 }
 

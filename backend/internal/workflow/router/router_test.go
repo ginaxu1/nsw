@@ -172,7 +172,7 @@ func TestConsignmentRouter_HandleGetConsignmentByID(t *testing.T) {
 	mockWM := new(MockWMV2)
 	svc := service.NewConsignmentService(db, nil)
 	require.NoError(t, svc.RegisterWorkflowManager(mockWM))
-	r := NewConsignmentRouter(svc, nil)
+	r := NewConsignmentRouter(svc, nil, nil)
 
 	consignmentID := uuid.NewString()
 	sqlMock.MatchExpectationsInOrder(false)
@@ -194,7 +194,7 @@ func TestConsignmentRouter_HandleGetConsignmentByID(t *testing.T) {
 func TestConsignmentRouter_HandleGetConsignments(t *testing.T) {
 	db, sqlMock := setupRouterTestDB(t)
 	svc := service.NewConsignmentService(db, nil)
-	r := NewConsignmentRouter(svc, nil)
+	r := NewConsignmentRouter(svc, nil, nil)
 
 	traderID := "trader1"
 	sqlMock.MatchExpectationsInOrder(false)
@@ -213,7 +213,7 @@ func TestConsignmentRouter_HandleGetConsignments(t *testing.T) {
 func TestConsignmentRouter_HandleCreateConsignment(t *testing.T) {
 	db, sqlMock := setupRouterTestDB(t)
 	svc := service.NewConsignmentService(db, nil)
-	r := NewConsignmentRouter(svc, nil)
+	r := NewConsignmentRouter(svc, nil, nil)
 
 	traderID := "trader1"
 	chaID := uuid.NewString()
@@ -385,7 +385,7 @@ func TestPreConsignmentRouter_HandleCreatePreConsignment_InvalidPayload(t *testi
 func TestConsignmentRouter_HandleGetConsignmentByID_InvalidID(t *testing.T) {
 	db, _ := setupRouterTestDB(t)
 	svc := service.NewConsignmentService(db, nil)
-	r := NewConsignmentRouter(svc, nil)
+	r := NewConsignmentRouter(svc, nil, nil)
 
 	req, _ := http.NewRequest("GET", "/api/v1/consignments/invalid-uuid", nil)
 	req.SetPathValue("id", "invalid-uuid")
@@ -398,7 +398,7 @@ func TestConsignmentRouter_HandleGetConsignmentByID_InvalidID(t *testing.T) {
 func TestConsignmentRouter_HandleGetConsignments_PaginationError(t *testing.T) {
 	db, _ := setupRouterTestDB(t)
 	svc := service.NewConsignmentService(db, nil)
-	r := NewConsignmentRouter(svc, nil)
+	r := NewConsignmentRouter(svc, nil, nil)
 
 	req, _ := http.NewRequest("GET", "/api/v1/consignments?limit=invalid", nil)
 	req = req.WithContext(withAuthContext(req.Context(), "trader1"))
@@ -412,7 +412,7 @@ func TestConsignmentRouter_HandleGetConsignments_PaginationError(t *testing.T) {
 func TestConsignmentRouter_HandleGetConsignmentByID_ServiceError(t *testing.T) {
 	db, sqlMock := setupRouterTestDB(t)
 	svc := service.NewConsignmentService(db, nil)
-	r := NewConsignmentRouter(svc, nil)
+	r := NewConsignmentRouter(svc, nil, nil)
 
 	id := uuid.NewString()
 	sqlMock.ExpectQuery("(?i)SELECT .* FROM \"consignments\"").WillReturnError(fmt.Errorf("db error"))
@@ -456,7 +456,7 @@ func TestHSCodeRouter_HandleGetAllHSCodes_ServiceError(t *testing.T) {
 func TestConsignmentRouter_HandleGetConsignments_ServiceError(t *testing.T) {
 	db, sqlMock := setupRouterTestDB(t)
 	svc := service.NewConsignmentService(db, nil)
-	r := NewConsignmentRouter(svc, nil)
+	r := NewConsignmentRouter(svc, nil, nil)
 
 	sqlMock.ExpectQuery("(?i)SELECT count").WillReturnError(fmt.Errorf("db error"))
 
@@ -469,7 +469,7 @@ func TestConsignmentRouter_HandleGetConsignments_ServiceError(t *testing.T) {
 
 func TestConsignmentRouter_HandleCreateConsignment_InvalidPayload(t *testing.T) {
 	db, _ := setupRouterTestDB(t)
-	r := NewConsignmentRouter(service.NewConsignmentService(db, nil), nil)
+	r := NewConsignmentRouter(service.NewConsignmentService(db, nil), nil, nil)
 
 	req, _ := http.NewRequest("POST", "/api/v1/consignments", bytes.NewBufferString("invalid json"))
 	req = req.WithContext(withAuthContext(req.Context(), "trader1"))

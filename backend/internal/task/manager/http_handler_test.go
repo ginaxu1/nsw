@@ -13,7 +13,7 @@ import (
 func TestHTTPHandler_HandleExecuteTask(t *testing.T) {
 	t.Run("Invalid Method", func(t *testing.T) {
 		tm := &taskManager{}
-		handler := NewHTTPHandler(tm, nil)
+		handler := NewHTTPHandler(tm)
 		req := httptest.NewRequest(http.MethodGet, "/execute", nil)
 		w := httptest.NewRecorder()
 
@@ -25,7 +25,7 @@ func TestHTTPHandler_HandleExecuteTask(t *testing.T) {
 
 	t.Run("Invalid Body", func(t *testing.T) {
 		tm := &taskManager{}
-		handler := NewHTTPHandler(tm, nil)
+		handler := NewHTTPHandler(tm)
 		req := httptest.NewRequest(http.MethodPost, "/execute", bytes.NewBufferString("invalid json"))
 		w := httptest.NewRecorder()
 
@@ -39,7 +39,7 @@ func TestHTTPHandler_HandleExecuteTask(t *testing.T) {
 func TestHTTPHandler_HandleGetTask(t *testing.T) {
 	t.Run("Missing TaskID", func(t *testing.T) {
 		tm, _, _, _ := setupTest(t)
-		handler := NewHTTPHandler(tm, nil)
+		handler := NewHTTPHandler(tm)
 		req := httptest.NewRequest(http.MethodGet, "/tasks/", nil)
 		// No path value set
 		w := httptest.NewRecorder()
@@ -52,7 +52,7 @@ func TestHTTPHandler_HandleGetTask(t *testing.T) {
 
 	t.Run("Invalid TaskID string", func(t *testing.T) {
 		tm, _, mockStore, _ := setupTest(t)
-		handler := NewHTTPHandler(tm, nil)
+		handler := NewHTTPHandler(tm)
 		req := httptest.NewRequest(http.MethodGet, "/tasks/invalid", nil)
 		req.SetPathValue("id", "invalid")
 		w := httptest.NewRecorder()

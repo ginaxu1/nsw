@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/LSFLK/argus/pkg/audit"
@@ -92,8 +91,11 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 		return nil, fmt.Errorf("failed to create temporal client: %w", err)
 	}
 
+	// Initialize audit client for Argus using centralized configuration.
+	auditClient := audit.NewClient(cfg.Audit)
+
 	consignmentService := service.NewConsignmentService(db, templateService)
-	consignmentRouter := router.NewConsignmentRouter(consignmentService, chaService)
+	consignmentRouter := router.NewConsignmentRouter(consignmentService, chaService, auditClient)
 
 	workflowRuntime, err := workflowruntime.NewRuntime(temporalClient, tm, templateService, consignmentService)
 	if err != nil {
@@ -162,14 +164,7 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 	// smsChannel := channels.NewSMSChannel(...)
 	// notificationManager.RegisterSMSChannel(smsChannel)
 
-	// Initialize audit client for Argus from ARGUS_SERVICE_URL environment variable.
-	auditURL := os.Getenv("ARGUS_SERVICE_URL")
-	auditClient := audit.NewClient(audit.Config{
-		BaseURL:   auditURL,
-		AuthToken: os.Getenv("ARGUS_AUTH_TOKEN"),
-	})
-
-	tmHandler := taskmanager.NewHTTPHandler(tm, auditClient)
+	tmHandler := taskmanager.NewHTTPHandler(tm)
 
 	// withAuth wraps an individual handler with the authentication middleware.
 	withAuth := authManager.Middleware()

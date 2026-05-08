@@ -1,11 +1,15 @@
 package router
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
+	"github.com/LSFLK/argus/pkg/audit"
 	"github.com/OpenNSW/nsw/internal/auth"
 	"github.com/OpenNSW/nsw/internal/workflow/model"
 	"github.com/OpenNSW/nsw/internal/workflow/service"
@@ -14,12 +18,32 @@ import (
 )
 
 type ConsignmentRouter struct {
-	cs  *service.ConsignmentService
-	cha *service.CHAService
+	cs          *service.ConsignmentService
+	cha         *service.CHAService
+	auditClient *audit.Client
 }
 
-func NewConsignmentRouter(cs *service.ConsignmentService, cha *service.CHAService) *ConsignmentRouter {
-	return &ConsignmentRouter{cs: cs, cha: cha}
+func NewConsignmentRouter(cs *service.ConsignmentService, cha *service.CHAService, auditClient *audit.Client) *ConsignmentRouter {
+	return &ConsignmentRouter{
+		cs:          cs,
+		cha:         cha,
+		auditClient: auditClient,
+	}
+}
+
+func (c *ConsignmentRouter) extractActor(r *http.Request) (string, string) {
+	actorID := "SYSTEM"
+	actorType := "SYSTEM"
+	if authCtx := auth.GetAuthContext(r.Context()); authCtx != nil {
+		if authCtx.User != nil {
+			actorID = authCtx.User.ID
+			actorType = "USER"
+		} else if authCtx.Client != nil {
+			actorID = authCtx.Client.ClientID
+			actorType = "SYSTEM"
+		}
+	}
+	return actorID, actorType
 }
 
 // HandleCreateConsignment handles POST /api/v1/consignments
@@ -48,6 +72,45 @@ func (c *ConsignmentRouter) HandleCreateConsignment(w http.ResponseWriter, r *ht
 	traderID := authCtx.User.ID
 	// Stage 1: create shell only
 	consignment, err := c.cs.CreateConsignmentShell(r.Context(), req.Flow, req.ChaID, traderID)
+
+	// Fire the audit log asynchronously before returning the HTTP response.
+	// Do not let any failure block or fail the actual API response to the user.
+	if c.auditClient != nil {
+		actorID, actorType := c.extractActor(r)
+
+		var status string
+		var msg string
+		var targetID *string
+		if err != nil {
+			status = "FAILURE"
+			msg = fmt.Sprintf("Failed to create consignment: %v", err)
+		} else {
+			status = "SUCCESS"
+			msg = fmt.Sprintf("User created consignment shell %s", consignment.ID)
+			targetID = &consignment.ID
+		}
+
+		metadata := map[string]any{
+			"flow":   req.Flow,
+			"cha_id": req.ChaID,
+		}
+
+		auditLog := audit.AuditLogRequest{
+			Timestamp:  time.Now().UTC().Format(time.RFC3339),
+			EventType:  "SYSTEM_EVENT",
+			Action:     "CREATE_CONSIGNMENT",
+			Status:     status,
+			ActorID:    actorID,
+			ActorType:  actorType,
+			TargetID:   targetID,
+			TargetType: "CONSIGNMENT",
+			Message:    []byte(msg),
+			Metadata:   metadata,
+		}
+
+		go c.auditClient.LogEvent(context.Background(), &auditLog)
+	}
+
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			http.Error(w, "CHA not found", http.StatusNotFound)
