@@ -2,7 +2,7 @@ name: Build and Push Development Images
 
 on:
   push:
-    branches: [ main, fix-main-build-lowercase ]
+    branches: [ main ]
   workflow_dispatch:
 
 permissions:
