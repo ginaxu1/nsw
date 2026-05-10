@@ -1,0 +1,82 @@
+# Default values for idp-umbrella.
+global:
+  clusterDomain: ""
+  namespace: ""
+
+fullnameOverride: ""
+
+podSecurityContext:
+  runAsNonRoot: true
+  fsGroup: 1001
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+seeder:
+  image:
+    repository: ghcr.io/opennsw/idp
+    pullPolicy: IfNotPresent
+    tag: 0.0.0-replace-me
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+seeding:
+  adminPassword: ""
+  sampleUserPassword: ""
+  m2mClientSecret: ""
+
+thunder:
+  enabled: true
+  replicaCount: 1
+
+  ingress:
+    enabled: true
+    hostname: "" # To be provided by GitOps env config
+    tls:
+      enabled: true
+      secretName: "idp-tls-cert"
+
+  configuration:
+    server:
+      publicUrl: "" # To be provided by GitOps env config
+    gateClient:
+      hostname: "idp-thunder-service"
+      port: 8090
+      scheme: "http"
+
+    database:
+      config:
+        host: "nsw-db"
+        port: 5432
+        name: "idp_db"
+        user: "postgres"
+        passwordRef:
+          name: "nsw-db-credentials"
+          key: "password"
+      runtime:
+        host: "nsw-db"
+        port: 5432
+        name: "idp_runtime_db"
+        user: "postgres"
+        passwordRef:
+          name: "nsw-db-credentials"
+          key: "password"
+      user:
+        host: "nsw-db"
+        port: 5432
+        name: "idp_user_db"
+        user: "postgres"
+        passwordRef:
+          name: "nsw-db-credentials"
+          key: "password"
+
+  cors:
+    allowedOrigins: []

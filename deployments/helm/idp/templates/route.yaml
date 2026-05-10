@@ -1,0 +1,25 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: idp-thunder-route
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: thunder
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  annotations:
+    haproxy.router.openshift.io/proxy-buffer-size: 128k
+    haproxy.router.openshift.io/proxy-buffering: "on"
+    haproxy.router.openshift.io/session-cookie-conditional-samesite-none: "true"
+    haproxy.router.openshift.io/session-cookie-samesite: None
+    haproxy.router.openshift.io/session-cookie-secure: "true"
+    haproxy.router.openshift.io/timeout: 60s
+spec:
+  host: {{ .Values.thunder.ingress.hostname }}
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+  to:
+    kind: Service
+    name: idp-thunder-service
+    weight: 100
+  wildcardPolicy: None

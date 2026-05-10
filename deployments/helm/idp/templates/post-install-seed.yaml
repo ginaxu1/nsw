@@ -1,0 +1,76 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: idp-sample-resources-seed
+  labels:
+    {{- include "idp-umbrella.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "idp-umbrella.labels" . | nindent 8 }}
+    spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      restartPolicy: OnFailure
+      {{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.imagePullSecrets | nindent 8 }}
+      {{- else }}
+      imagePullSecrets:
+        - name: ghcr-secret
+      {{- end }}
+      containers:
+        - name: seeder
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.seeder.image.repository }}:{{ .Values.seeder.image.tag }}"
+          imagePullPolicy: {{ .Values.seeder.image.pullPolicy }}
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              echo "Waiting for identity provider to be ready..."
+              RETRIES=0
+              MAX_RETRIES=20
+              until curl -k -s -o /dev/null "${THUNDER_URL}/gate/signin" || [ $RETRIES -eq $MAX_RETRIES ]; do
+                echo "Still waiting... ($((RETRIES+1))/$MAX_RETRIES)"
+                sleep 10
+                RETRIES=$((RETRIES+1))
+              done
+              if [ $RETRIES -eq $MAX_RETRIES ]; then
+                  echo "Error: IDP did not become healthy in time."
+                  exit 1
+              fi
+              echo "IDP is healthy. Running sample resource seeding..."
+              bash /mnt/scripts/02-sample-resources.sh
+          env:
+            - name: THUNDER_URL
+              value: "http://{{ .Values.thunder.configuration.gateClient.hostname }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.thunder.configuration.gateClient.port }}"
+            - name: THUNDER_ADMIN_USERNAME
+              value: "admin"
+            - name: THUNDER_ADMIN_PASSWORD
+              value: {{ .Values.seeding.adminPassword | default "replace-me" | quote }}
+            - name: THUNDER_SAMPLE_USER_PASSWORD
+              value: {{ .Values.seeding.sampleUserPassword | default "replace-me" | quote }}
+            - name: THUNDER_M2M_CLIENT_SECRET
+              value: {{ .Values.seeding.m2mClientSecret | default "replace-me" | quote }}
+            - name: TRADER_APP_REDIRECT_DOMAIN
+              value: "{{ .Release.Name }}-trader-app-{{ .Release.Namespace }}.{{ .Values.global.clusterDomain }}"
+            - name: NPQS_APP_REDIRECT_DOMAIN
+              value: "{{ .Release.Name }}-oga-npqs-{{ .Release.Namespace }}.{{ .Values.global.clusterDomain }}"
+            - name: FCAU_APP_REDIRECT_DOMAIN
+              value: "{{ .Release.Name }}-oga-fcau-{{ .Release.Namespace }}.{{ .Values.global.clusterDomain }}"
+            - name: IRD_APP_REDIRECT_DOMAIN
+              value: "{{ .Release.Name }}-oga-ird-{{ .Release.Namespace }}.{{ .Values.global.clusterDomain }}"
+          volumeMounts:
+            - name: scripts
+              mountPath: /mnt/scripts
+          resources:
+            {{- toYaml .Values.seeder.resources | nindent 12 }}
+      volumes:
+        - name: scripts
+          configMap:
+            name: idp-seeding-scripts
