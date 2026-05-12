@@ -19,7 +19,7 @@ deployments/helm/idp/
 ├── files/
 │   └── 02-sample-resources.sh # Seeding post-install hook shell script
 └── charts/
-    └── thunderid-0.37.0.tgz # Patched, compressed binary sub-chart archive
+    └── thunderid-0.35.0.tgz # Patched, compressed binary sub-chart archive
 ```
 
 ---

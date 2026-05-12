@@ -48,7 +48,9 @@ spec:
               bash /mnt/scripts/02-sample-resources.sh
           env:
             - name: THUNDER_URL
-              value: "http://{{ .Values.thunder.configuration.gateClient.hostname }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.thunder.configuration.gateClient.port }}"
+              value: "https://{{ .Release.Name }}-service.{{ .Release.Namespace }}.svc.cluster.local:8090"
+            - name: THUNDER_BASE_URL
+              value: {{ .Values.thunder.configuration.server.publicUrl | quote }}
             - name: THUNDER_ADMIN_USERNAME
               value: "admin"
             - name: THUNDER_ADMIN_PASSWORD
@@ -58,13 +60,13 @@ spec:
             - name: THUNDER_M2M_CLIENT_SECRET
               value: {{ .Values.seeding.m2mClientSecret | default "replace-me" | quote }}
             - name: TRADER_APP_REDIRECT_DOMAIN
-              value: "{{ .Release.Name }}-trader-app-{{ .Release.Namespace }}.{{ .Values.global.clusterDomain }}"
+              value: {{ required "seeding.appDomains.traderApp is required" .Values.seeding.appDomains.traderApp | quote }}
             - name: NPQS_APP_REDIRECT_DOMAIN
-              value: "{{ .Release.Name }}-oga-npqs-{{ .Release.Namespace }}.{{ .Values.global.clusterDomain }}"
+              value: {{ required "seeding.appDomains.ogaNpqs is required" .Values.seeding.appDomains.ogaNpqs | quote }}
             - name: FCAU_APP_REDIRECT_DOMAIN
-              value: "{{ .Release.Name }}-oga-fcau-{{ .Release.Namespace }}.{{ .Values.global.clusterDomain }}"
+              value: {{ required "seeding.appDomains.ogaFcau is required" .Values.seeding.appDomains.ogaFcau | quote }}
             - name: IRD_APP_REDIRECT_DOMAIN
-              value: "{{ .Release.Name }}-oga-ird-{{ .Release.Namespace }}.{{ .Values.global.clusterDomain }}"
+              value: {{ required "seeding.appDomains.ogaIrd is required" .Values.seeding.appDomains.ogaIrd | quote }}
           volumeMounts:
             - name: scripts
               mountPath: /mnt/scripts

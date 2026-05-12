@@ -1,6 +1,6 @@
 dependencies:
 - name: thunderid
-  repository: file://charts/thunder
-  version: 0.37.0
-digest: sha256:50dcc07fe6dba13bc6915d0f63da73f9fe9767c0a1c6c2eec2334cc584f8cb41
-generated: "2026-05-09T11:43:03.745967-07:00"
+  repository: file://./charts/thunderid
+  version: 0.35.0
+digest: sha256:d8c554c0e6ad3f9c391c200344e65fc8a7fffb63e613d66d8545197ada460c87
+generated: "2026-05-12T14:16:24.768656+05:30"

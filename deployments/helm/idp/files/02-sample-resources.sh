@@ -111,7 +111,8 @@ get_application_id_by_client_id() {
         return
     fi
 
-    echo "$BODY" | sed 's/},{/}\n{/g' | grep "\"client_id\":\"${CLIENT_ID}\"" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4
+    # Handle both clientId and client_id field names across different versions
+    echo "$BODY" | sed 's/},{/}\n{/g' | grep -E "\"client_?Id\":\"${CLIENT_ID}\"" -i | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4
 }
 
 create_user_in_ou() {
@@ -170,6 +171,7 @@ create_spa_application() {
         local PORT="$4"
         local ALLOWED_USER_TYPE="$5"
         local REDIRECT_DOMAIN="$6"
+        local OU_ID="$7"
         local RESPONSE HTTP_CODE BODY
         local APP_ID APP_CLIENT_ID
 
@@ -178,53 +180,52 @@ create_spa_application() {
         ADDITIONAL_FIELDS=""
         if [[ -n "$CLASSIC_THEME_ID" ]]; then
                 ADDITIONAL_FIELDS="${ADDITIONAL_FIELDS}
-    \"theme_id\": \"${CLASSIC_THEME_ID}\"," 
+    \"themeId\": \"${CLASSIC_THEME_ID}\"," 
         fi
         if [[ -n "$AUTH_FLOW_ID" ]]; then
                 ADDITIONAL_FIELDS="${ADDITIONAL_FIELDS}
-    \"auth_flow_id\": \"${AUTH_FLOW_ID}\"," 
+    \"authFlowId\": \"${AUTH_FLOW_ID}\"," 
         fi
         if [[ -n "$REG_FLOW_ID" ]]; then
                 ADDITIONAL_FIELDS="${ADDITIONAL_FIELDS}
-    \"registration_flow_id\": \"${REG_FLOW_ID}\"," 
+    \"registrationFlowId\": \"${REG_FLOW_ID}\"," 
         fi
 
         read -r -d '' APP_PAYLOAD <<JSON || true
 {
     "name": "${APP_NAME}",
     "description": "${APP_DESCRIPTION}",${ADDITIONAL_FIELDS}
-    "is_registration_flow_enabled": false,
-    "template": "react",
-    "logo_url": "https://ssl.gstatic.com/docs/common/profile/kiwi_lg.png",
+    "ouId": "${OU_ID}",
+    "isRegistrationFlowEnabled": false,
+    "logoUrl": "https://ssl.gstatic.com/docs/common/profile/kiwi_lg.png",
     "assertion": {
-        "validity_period": 3600
+        "validityPeriod": 3600
     },
-    "certificate": {
-        "type": "NONE"
-    },
-    "inbound_auth_config": [
+    "inboundAuthConfig": [
         {
             "type": "oauth2",
             "config": {
-                "client_id": "${CLIENT_ID}",
-                "redirect_uris": [
+                "clientId": "${CLIENT_ID}",
+                "redirectUris": [
                     "http://localhost:${PORT}",
-                    "https://localhost:${PORT}"$(if [[ -n "$REDIRECT_DOMAIN" ]]; then echo ", \"https://${REDIRECT_DOMAIN}\""; fi)
+                    "http://localhost:${PORT}/",
+                    "https://localhost:${PORT}",
+                    "https://localhost:${PORT}/"$(if [[ -n "$REDIRECT_DOMAIN" ]]; then echo ", \"https://${REDIRECT_DOMAIN}\", \"https://${REDIRECT_DOMAIN}/\""; fi)
                 ],
-                "grant_types": [
+                "grantTypes": [
                     "authorization_code",
                     "refresh_token"
                 ],
-                "response_types": [
+                "responseTypes": [
                     "code"
                 ],
-                "token_endpoint_auth_method": "none",
-                "pkce_required": true,
-                "public_client": true,
+                "tokenEndpointAuthMethod": "none",
+                "pkceRequired": true,
+                "publicClient": true,
                 "token": {
-                    "access_token": {
-                        "validity_period": 3600,
-                        "user_attributes": [
+                    "accessToken": {
+                        "validityPeriod": 3600,
+                        "userAttributes": [
                             "email",
                             "family_name",
                             "given_name",
@@ -236,9 +237,9 @@ create_spa_application() {
                             "username"
                         ]
                     },
-                    "id_token": {
-                        "validity_period": 3600,
-                        "user_attributes": [
+                    "idToken": {
+                        "validityPeriod": 3600,
+                        "userAttributes": [
                             "family_name",
                             "given_name",
                             "email"
@@ -252,14 +253,7 @@ create_spa_application() {
                     "group",
                     "role"
                 ],
-                "user_info": {
-                    "user_attributes": [
-                        "family_name",
-                        "given_name",
-                        "email"
-                    ]
-                },
-                "scope_claims": {
+                "scopeClaims": {
                     "group": [
                         "groups"
                     ],
@@ -270,7 +264,7 @@ create_spa_application() {
             }
         }
     ],
-    "allowed_user_types": [
+    "allowedUserTypes": [
         "${ALLOWED_USER_TYPE}"
     ]
 }
@@ -280,10 +274,15 @@ JSON
         HTTP_CODE="${RESPONSE: -3}"
         BODY="${RESPONSE%???}"
 
+        if [[ "$HTTP_CODE" != "201" ]] && [[ "$HTTP_CODE" != "200" ]] && [[ "$HTTP_CODE" != "202" ]] && [[ "$HTTP_CODE" != "409" ]] && ! [[ "$BODY" =~ (Application\ already\ exists|APP-1022) ]]; then
+            echo "FAILED PAYLOAD:"
+            echo "${APP_PAYLOAD}"
+        fi
+
         if [[ "$HTTP_CODE" == "201" ]] || [[ "$HTTP_CODE" == "200" ]] || [[ "$HTTP_CODE" == "202" ]]; then
                 log_success "${APP_NAME} application created successfully"
                 APP_ID=$(extract_first_id "$BODY")
-                APP_CLIENT_ID=$(echo "$BODY" | grep -o '"client_id":"[^"]*"' | head -1 | cut -d'"' -f4)
+                APP_CLIENT_ID=$(echo "$BODY" | grep -o '"clientId":"[^"]*"' | head -1 | cut -d'"' -f4)
                 if [[ -n "$APP_ID" ]]; then
                         log_info "${APP_NAME} app ID: ${APP_ID}"
                 fi
@@ -291,7 +290,32 @@ JSON
                         log_info "${APP_NAME} client ID: ${APP_CLIENT_ID}"
                 fi
         elif [[ "$HTTP_CODE" == "409" ]] || ([[ "$HTTP_CODE" == "400" ]] && [[ "$BODY" =~ (Application\ already\ exists|APP-1022) ]]); then
-                log_warning "${APP_NAME} application already exists, skipping"
+                log_warning "${APP_NAME} application already exists, updating redirect URIs..."
+                APP_ID=$(get_application_id_by_client_id "${CLIENT_ID}")
+                if [[ -n "$APP_ID" ]]; then
+                        # Fetch current app state
+                        GET_RESPONSE=$(thunder_api_call GET "/applications/${APP_ID}")
+                        GET_BODY="${GET_RESPONSE%???}"
+                        
+                        # Update redirect URIs in the full JSON using sed
+                        URIS_JSON="\"http://localhost:${PORT}\",\"http://localhost:${PORT}/\",\"https://localhost:${PORT}\",\"https://localhost:${PORT}/\""
+                        if [[ -n "$REDIRECT_DOMAIN" ]]; then
+                            URIS_JSON="${URIS_JSON},\"https://${REDIRECT_DOMAIN}\",\"https://${REDIRECT_DOMAIN}/\""
+                        fi
+                        
+                        UPDATED_PAYLOAD=$(echo "$GET_BODY" | sed "s#\"redirectUris\":\[[^]]*\]#\"redirectUris\":[${URIS_JSON}]#g")
+
+                        PUT_RESPONSE=$(thunder_api_call PUT "/applications/${APP_ID}" "${UPDATED_PAYLOAD}")
+                        PUT_HTTP_CODE="${PUT_RESPONSE: -3}"
+                        if [[ "$PUT_HTTP_CODE" == "200" ]] || [[ "$PUT_HTTP_CODE" == "204" ]]; then
+                                log_success "${APP_NAME} redirect URIs updated successfully via PUT"
+                        else
+                                log_warning "${APP_NAME} redirect URI update returned HTTP ${PUT_HTTP_CODE} (non-fatal)"
+                                echo "Response: ${PUT_RESPONSE%???}"
+                        fi
+                else
+                        log_warning "${APP_NAME} application exists but could not retrieve its ID to update redirect URIs"
+                fi
         else
                 log_error "Failed to create ${APP_NAME} application (HTTP $HTTP_CODE)"
                 echo "Response: $BODY"
@@ -313,34 +337,32 @@ create_m2m_application() {
 {
     "name": "${APP_NAME}",
     "description": "${APP_DESCRIPTION}",
-    "is_registration_flow_enabled": false,
+    "ouId": "${DEFAULT_OU_ID}",
+    "isRegistrationFlowEnabled": false,
     "assertion": {
-        "validity_period": 3600
+        "validityPeriod": 3600
     },
-    "certificate": {
-        "type": "NONE"
-    },
-    "inbound_auth_config": [
+    "inboundAuthConfig": [
         {
             "type": "oauth2",
             "config": {
-                "client_id": "${CLIENT_ID}",
-                "client_secret": "${CLIENT_SECRET}",
-                "grant_types": [
+                "clientId": "${CLIENT_ID}",
+                "clientSecret": "${CLIENT_SECRET}",
+                "grantTypes": [
                     "client_credentials"
                 ],
-                "token_endpoint_auth_method": "client_secret_basic",
-                "pkce_required": false,
-                "public_client": false,
+                "tokenEndpointAuthMethod": "client_secret_basic",
+                "pkceRequired": false,
+                "publicClient": false,
                 "token": {
-                    "access_token": {
-                        "validity_period": 3600
+                    "accessToken": {
+                        "validityPeriod": 3600
                     }
                 }
             }
         }
     ],
-    "allowed_user_types": []
+    "allowedUserTypes": []
 }
 JSON
 
@@ -351,7 +373,7 @@ JSON
     if [[ "$HTTP_CODE" == "201" ]] || [[ "$HTTP_CODE" == "200" ]] || [[ "$HTTP_CODE" == "202" ]]; then
         log_success "${APP_NAME} M2M application created successfully"
         APP_ID=$(extract_first_id "$BODY")
-        APP_CLIENT_ID=$(echo "$BODY" | grep -o '"client_id":"[^"]*"' | head -1 | cut -d'"' -f4)
+        APP_CLIENT_ID=$(echo "$BODY" | grep -o '"clientId":"[^"]*"' | head -1 | cut -d'"' -f4)
     elif [[ "$HTTP_CODE" == "409" ]] || ([[ "$HTTP_CODE" == "400" ]] && [[ "$BODY" =~ (Application\ already\ exists|APP-1022) ]]); then
         log_warning "${APP_NAME} M2M application already exists, retrieving ID..."
         APP_ID=$(get_application_id_by_client_id "$CLIENT_ID")
@@ -1094,10 +1116,38 @@ echo ""
 # Create 4 SPA Applications
 # ============================================================================
 
-create_spa_application "TraderApp" "Application for trader portal built with React" "TRADER_PORTAL_APP" "5173" "Private_User" "${TRADER_APP_REDIRECT_DOMAIN}"
-create_spa_application "NPQSPortalApp" "Application for NPQS portal built with React" "OGA_PORTAL_APP_NPQS" "5174" "Government_User" "${NPQS_APP_REDIRECT_DOMAIN}"
-create_spa_application "FCAUPortalApp" "Application for FCAU portal built with React" "OGA_PORTAL_APP_FCAU" "5175" "Government_User" "${FCAU_APP_REDIRECT_DOMAIN}"
-create_spa_application "IRDPortalApp" "Application for IRD portal built with React" "OGA_PORTAL_APP_IRD" "5176" "Government_User" "${IRD_APP_REDIRECT_DOMAIN}"
+create_spa_application "TraderApp" "Application for trader portal built with React" "TRADER_PORTAL_APP" "5173" "Private_User" "${TRADER_APP_REDIRECT_DOMAIN}" "${PRIVATE_SECTOR_OU_ID}"
+create_spa_application "NPQSPortalApp" "Application for NPQS portal built with React" "OGA_PORTAL_APP_NPQS" "5174" "Government_User" "${NPQS_APP_REDIRECT_DOMAIN}" "${NPQS_OU_ID}"
+create_spa_application "FCAUPortalApp" "Application for FCAU portal built with React" "OGA_PORTAL_APP_FCAU" "5175" "Government_User" "${FCAU_APP_REDIRECT_DOMAIN}" "${FCAU_OU_ID}"
+create_spa_application "IRDPortalApp" "Application for IRD portal built with React" "OGA_PORTAL_APP_IRD" "5176" "Government_User" "${IRD_APP_REDIRECT_DOMAIN}" "${IRD_OU_ID}"
+
+echo ""
+
+# ============================================================================
+# Patch CONSOLE Application (System App)
+# ============================================================================
+
+log_info "Patching CONSOLE application redirect URIs..."
+CONSOLE_APP_ID=$(get_application_id_by_client_id "CONSOLE")
+if [[ -n "$CONSOLE_APP_ID" ]]; then
+    # Fetch current state
+    GET_RESPONSE=$(thunder_api_call GET "/applications/${CONSOLE_APP_ID}")
+    GET_BODY="${GET_RESPONSE%???}"
+
+    # Update redirect URIs using sed
+    CONSOLE_URIS="\"${THUNDER_BASE_URL}/console\",\"${THUNDER_BASE_URL}/console/\",\"http://localhost:8080/console\",\"http://localhost:8080/console/\""
+    UPDATED_PAYLOAD=$(echo "$GET_BODY" | sed "s#\"redirectUris\":\[[^]]*\]#\"redirectUris\":[${CONSOLE_URIS}]#g")
+
+    PUT_RESPONSE=$(thunder_api_call PUT "/applications/${CONSOLE_APP_ID}" "${UPDATED_PAYLOAD}")
+    PUT_HTTP_CODE="${PUT_RESPONSE: -3}"
+    if [[ "$PUT_HTTP_CODE" == "200" ]] || [[ "$PUT_HTTP_CODE" == "204" ]]; then
+        log_success "CONSOLE application redirect URIs patched successfully via PUT"
+    else
+        log_warning "CONSOLE application patch returned HTTP ${PUT_HTTP_CODE}"
+    fi
+else
+    log_warning "Could not find CONSOLE application to patch"
+fi
 
 echo ""
 

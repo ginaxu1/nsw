@@ -7,7 +7,7 @@ fullnameOverride: ""
 
 podSecurityContext:
   runAsNonRoot: true
-  fsGroup: 1001
+  fsGroup: null
 
 securityContext:
   allowPrivilegeEscalation: false
@@ -32,6 +32,13 @@ seeding:
   adminPassword: ""
   sampleUserPassword: ""
   m2mClientSecret: ""
+  # Explicit redirect domains for each SPA application.
+  # Each value should be just the hostname (without https://).
+  appDomains:
+    traderApp: ""    # e.g. trader-app-nsw-dev.apps.sovecloud1.akaza.lk
+    ogaNpqs: ""      # e.g. oga-npqs-app-nsw-dev.apps.sovecloud1.akaza.lk
+    ogaFcau: ""      # e.g. oga-fcau-app-nsw-dev.apps.sovecloud1.akaza.lk
+    ogaIrd: ""       # e.g. oga-ird-app-nsw-dev.apps.sovecloud1.akaza.lk
 
 thunder:
   enabled: true
@@ -49,8 +56,29 @@ thunder:
       publicUrl: "" # To be provided by GitOps env config
     gateClient:
       hostname: "idp-thunder-service"
-      port: 8090
+      port: 8080
       scheme: "http"
+
+  deployment:
+    securityContext:
+      readOnlyRootFilesystem: false  # Required for bootstrap setup-job to run binaries
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 200m
+        memory: 256Mi
+
+  setup:
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+
 
     database:
       config:

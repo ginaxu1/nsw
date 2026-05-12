@@ -1,7 +1,7 @@
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: idp-thunder-route
+  name: idp-thunder
   namespace: {{ .Release.Namespace }}
   labels:
     app.kubernetes.io/name: thunder
@@ -17,9 +17,9 @@ spec:
   host: {{ .Values.thunder.ingress.hostname }}
   tls:
     insecureEdgeTerminationPolicy: Redirect
-    termination: edge
+    termination: passthrough
   to:
     kind: Service
-    name: idp-thunder-service
+    name: {{ .Release.Name }}-service
     weight: 100
   wildcardPolicy: None
