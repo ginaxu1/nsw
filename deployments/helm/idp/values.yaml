@@ -58,6 +58,11 @@ thunder:
       hostname: "idp-thunder-service"
       port: 8080
       scheme: "http"
+      path: "/gate/"
+
+  consoleClient:
+    path: "/console/"
+
 
   deployment:
     securityContext:
