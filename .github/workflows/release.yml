@@ -62,14 +62,14 @@ jobs:
 
           - service_name: Trader Portal
             image_name: trader-app
-            context: ./portals
-            dockerfile: ./portals/apps/trader-app/Dockerfile
+            context: ./nsw-trader-ui
+            dockerfile: ./nsw-trader-ui/app/Dockerfile
             description: NSW Trader Portal Frontend
 
           - service_name: OGA Portal
             image_name: oga-app
-            context: ./portals
-            dockerfile: ./portals/apps/oga-app/Dockerfile
+            context: ./nsw-agency-ui
+            dockerfile: ./nsw-agency-ui/app/Dockerfile
             description: NSW OGA Officer Portal Frontend
 
     env:

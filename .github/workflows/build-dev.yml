@@ -34,12 +34,12 @@ jobs:
             dockerfile: ./oga/Dockerfile
           - service_name: Trader Portal
             image_name: trader-app
-            context: ./portals
-            dockerfile: ./portals/apps/trader-app/Dockerfile
+            context: ./nsw-trader-ui
+            dockerfile: ./nsw-trader-ui/app/Dockerfile
           - service_name: OGA Portal
             image_name: oga-app
-            context: ./portals
-            dockerfile: ./portals/apps/oga-app/Dockerfile
+            context: ./nsw-agency-ui
+            dockerfile: ./nsw-agency-ui/app/Dockerfile
 
     steps:
       - name: Checkout Application Repository
