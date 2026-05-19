@@ -1,0 +1,39 @@
+FROM node:22-bookworm-slim AS builder
+
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+WORKDIR /workspace
+
+RUN corepack enable
+
+# Copy workspace manifests
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY app/package.json app/package.json
+
+# Optimized install (combined fetch/install to save local disk layers)
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile
+
+COPY . .
+
+# Build including dependencies
+RUN pnpm --filter oga-app... build
+
+FROM nginxinc/nginx-unprivileged:stable-alpine3.23-perl
+
+LABEL org.opencontainers.image.source="https://github.com/OpenNSW/nsw"
+LABEL org.opencontainers.image.description="NSW OGA Officer Portal Frontend"
+
+COPY app/nginx.conf /etc/nginx/templates/default.conf.template
+COPY --from=builder /workspace/app/dist /usr/share/nginx/html
+
+# OpenShift Compliance: Fix permissions for random UID (Group 0)
+USER root
+COPY --chown=101:0 app/docker-entrypoint.sh /docker-entrypoint.d/40-runtime-env.sh
+RUN chmod +x /docker-entrypoint.d/40-runtime-env.sh && \
+    chmod -R g+w /var/cache/nginx /var/run /var/log/nginx /etc/nginx/conf.d /usr/share/nginx/html
+USER 101
+EXPOSE 8080
+
+
+CMD ["nginx", "-g", "daemon off;"]

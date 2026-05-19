@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "paths": {}
+  },
+  "files": [],
+  "references": [
+    {
+      "path": "./app"
+    }
+  ]
+}

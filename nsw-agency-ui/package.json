@@ -1,0 +1,27 @@
+{
+  "name": "nsw-agency-ui-workspace",
+  "version": "1.0.0",
+  "description": "NSW OGA Officer Portal – pnpm workspace (nsw-agency-ui)",
+  "packageManager": "pnpm@11.1.2",
+  "engines": {
+    "node": ">=22.18.0",
+    "pnpm": ">=10.0.0"
+  },
+  "scripts": {
+    "build": "pnpm --filter oga-app build",
+    "dev": "pnpm --filter oga-app dev",
+    "lint": "pnpm --filter oga-app lint",
+    "format": "pnpm --filter oga-app format",
+    "type-check": "pnpm --filter oga-app type-check",
+    "format:check": "prettier --check .",
+    "format:fix": "prettier --write .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "private": true,
+  "devDependencies": {
+    "prettier": "^3.8.3"
+  }
+}

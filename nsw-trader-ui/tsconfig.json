@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "paths": {
+      "@opennsw/ui": ["./packages/ui/src/index.ts"],
+      "@opennsw/jsonforms-renderers": ["./packages/jsonforms-renderers/src/index.ts"]
+    }
+  },
+  "files": [],
+  "references": [
+    {
+      "path": "./app"
+    },
+    {
+      "path": "./packages/ui"
+    },
+    {
+      "path": "./packages/jsonforms-renderers"
+    }
+  ]
+}

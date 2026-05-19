@@ -1,0 +1,38 @@
+FROM node:22-bookworm-slim AS builder
+
+WORKDIR /workspace
+
+RUN corepack enable
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
+COPY app/package.json app/package.json
+COPY packages/jsonforms-renderers/package.json packages/jsonforms-renderers/package.json
+COPY packages/ui/package.json packages/ui/package.json
+
+RUN pnpm install --frozen-lockfile
+
+COPY . .
+
+RUN pnpm --filter trader-app build
+
+FROM nginxinc/nginx-unprivileged:stable-alpine3.23-perl
+
+LABEL org.opencontainers.image.source="https://github.com/OpenNSW/nsw"
+LABEL org.opencontainers.image.description="NSW Trader Portal Frontend"
+
+COPY app/nginx.conf /etc/nginx/templates/default.conf.template
+COPY --from=builder /workspace/app/dist /usr/share/nginx/html
+
+# OpenShift Compliance: Fix permissions for random UID (Group 0)
+USER root
+COPY --chown=101:0 app/docker-entrypoint.sh /docker-entrypoint.d/40-runtime-env.sh
+RUN chmod +x /docker-entrypoint.d/40-runtime-env.sh && \
+    chmod -R g+w /var/cache/nginx /var/run /var/log/nginx /etc/nginx/conf.d /usr/share/nginx/html
+USER 101
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget -qO- http://localhost:8080/ || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]
+

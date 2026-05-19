@@ -1,0 +1,27 @@
+{
+  "name": "nsw-trader-ui-workspace",
+  "version": "1.0.0",
+  "description": "NSW Trader Portal – pnpm workspace (nsw-trader-ui)",
+  "packageManager": "pnpm@11.1.2",
+  "engines": {
+    "node": ">=22.18.0",
+    "pnpm": ">=10.0.0"
+  },
+  "scripts": {
+    "build": "pnpm --recursive run build",
+    "dev": "pnpm --filter trader-app dev",
+    "lint": "pnpm --recursive --parallel run lint",
+    "format": "pnpm --recursive --parallel run format",
+    "type-check": "pnpm --recursive --parallel run type-check",
+    "format:check": "prettier --check .",
+    "format:fix": "prettier --write .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "private": true,
+  "devDependencies": {
+    "prettier": "^3.8.3"
+  }
+}
