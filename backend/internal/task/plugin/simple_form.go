@@ -308,7 +308,7 @@ func (s *SimpleForm) resolveAction(request *ExecutionRequest) (string, error) {
 		}
 		return simpleFormFSMSubmitComplete, nil
 
-	case SimpleFormActionOgaVerify:
+	case SimpleFormActionOgaVerify, "AGENCY_VERIFICATION":
 		data, err := s.parseFormData(request.Content)
 		if err != nil {
 			return "", fmt.Errorf("invalid verification data: %w", err)
@@ -325,9 +325,9 @@ func (s *SimpleForm) resolveAction(request *ExecutionRequest) (string, error) {
 		}
 		return simpleFormFSMOgaRejected, nil
 
-	case SimpleFormActionOgaFeedback:
-		// OGA_VERIFICATION_FEEDBACK is a distinct action — no resolution needed,
-		// it maps directly to the feedback FSM edge.
+	case SimpleFormActionOgaFeedback, "AGENCY_VERIFICATION_FEEDBACK":
+		// OGA_VERIFICATION_FEEDBACK (and its alias AGENCY_VERIFICATION_FEEDBACK) is a distinct action —
+		// no resolution needed, it maps directly to the feedback FSM edge.
 		return SimpleFormActionOgaFeedback, nil
 
 	default:

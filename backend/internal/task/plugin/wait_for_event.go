@@ -189,7 +189,7 @@ func (t *WaitForEventTask) Execute(ctx context.Context, request *ExecutionReques
 				Success: true,
 			},
 		}, nil
-	case waitForEventFSMComplete:
+	case waitForEventFSMComplete, "AGENCY_VERIFICATION":
 		// Persist the raw response to Local Store for rendering
 		if err := t.api.WriteToLocalStore("eventResponse", request.Content); err != nil {
 			slog.Warn("failed to write callback response to local store", "taskId", t.api.GetTaskID(), "error", err)
