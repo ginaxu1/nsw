@@ -20,9 +20,15 @@ spec:
       imagePullSecrets:
         {{- toYaml .Values.imagePullSecrets | nindent 8 }}
       {{- end }}
-      {{- with .Values.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
+      {{- if .Values.templates.enabled }}
+      initContainers:
+        - name: copy-templates
+          image: "{{ .Values.templates.image.repository }}:{{ .Values.templates.image.tag | default "dev-latest" }}"
+          imagePullPolicy: {{ .Values.templates.image.pullPolicy | default "IfNotPresent" }}
+          command: ["sh", "-c", "cp /templates/fcau/*/reviewerinput_jsonform.json /shared/"]
+          volumeMounts:
+            - name: forms-volume
+              mountPath: /shared
       {{- end }}
       containers:
         - name: {{ .Chart.Name }}
@@ -96,7 +102,15 @@ spec:
             runAsNonRoot: true
             capabilities:
               drop: ["ALL"]
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       volumes:
         - name: forms-volume
+          {{- if .Values.templates.enabled }}
+          emptyDir: {}
+          {{- else }}
           configMap:
             name: {{ include "nsw-agency-backend.fullname" . }}-forms
+          {{- end }}

@@ -79,3 +79,10 @@ affinity:
             matchLabels:
               app.kubernetes.io/name: nsw-agency-backend
           topologyKey: kubernetes.io/hostname
+
+templates:
+  enabled: false
+  image:
+    repository: ghcr.io/opennsw/one-trade-templates
+    tag: dev-latest
+    pullPolicy: IfNotPresent
