@@ -144,7 +144,7 @@ func Build(ctx context.Context, cfg *config.Config) (*App, error) {
 	paymentService.SetTaskCompleter(tm)
 
 	consignmentService := consignment.NewService(db, templateService, chaService, companyService, userProfileService, hsCodeService)
-	consignmentRouter := consignment.NewRouter(consignmentService, chaService, companyService)
+	consignmentRouter := consignment.NewRouter(consignmentService, chaService, companyService, nil)
 
 	pr, stopParentRunner, err := workflow.WireParentRunner(temporalClient, tm, consignmentService)
 	if err != nil {
