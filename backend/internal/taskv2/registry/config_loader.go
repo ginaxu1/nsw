@@ -49,6 +49,10 @@ func LoadConfigsInto(reg *InMemRegistry, rootDir string) error {
 	taskFolders := 0
 	for _, e := range entries {
 		if e.IsDir() {
+			// Skip hidden directories (like Kubernetes ConfigMap symlink targets e.g., ..data)
+			if strings.HasPrefix(e.Name(), ".") {
+				continue
+			}
 			if err := loadTaskFolder(reg, filepath.Join(rootDir, e.Name())); err != nil {
 				return err
 			}
